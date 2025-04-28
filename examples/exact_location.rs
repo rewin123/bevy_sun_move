@@ -5,42 +5,37 @@ use bevy::{
     pbr::{light_consts::lux, Atmosphere, AtmosphereSettings, CascadeShadowConfigBuilder, AmbientLight},
     prelude::*,
     render::camera::Exposure,
+     render::mesh::{Mesh3d}, // Added missing imports
+    scene::SceneRoot, // Added missing imports
+    gltf::GltfAssetLabel, // Added missing imports
 };
-use bevy_sun_move::*;
+use bevy_sun_move::*; // Your library
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
-use egui_plot::{Line, Plot, PlotPoints};
-
+use egui_plot::{Line, Plot, PlotPoints, AxisHints}; // Added AxisHints
 
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_plugins(SunMovePlugin)
+        .add_plugins(SunMovePlugin) // Your plugin
         .add_plugins(EguiPlugin {
-            enable_multipass_for_primary_context: false,
+            enable_multipass_for_primary_context: false
         })
-
         .add_systems(Startup, (setup_camera_fog, setup_terrain_scene))
-        // .add_systems(Update, ui_system)
-        // .insert_resource(SunMoveConfig {
-        //     // London coordinates
-        //     latitude_degrees: 51.5,
-        //     day_of_year: 172.0,
-        //     daynight_duration_secs: 60.0, // smaller for testing
-        //     ..Default::default()
-        // })
+        // .add_systems(Update, (ui_system, update_ambient_light)) // Add ui system and a system to update ambient light
+        .add_systems(Update, ui_system)
         .run();
 }
 
 fn setup_camera_fog(mut commands: Commands) {
     commands.spawn((
         Camera3d::default(),
+        Transform::from_xyz(-1.2, 0.15, 0.0).looking_at(Vec3::Y * 0.1, Vec3::Y),
         // HDR is required for atmospheric scattering to be properly applied to the scene
         Camera {
             hdr: true,
             ..default()
         },
-        Transform::from_xyz(-1.2, 0.15, 0.0).looking_at(Vec3::Y * 0.1, Vec3::Y),
         // This is the component that enables atmospheric scattering for a camera
         Atmosphere::EARTH,
         // The scene is in units of 10km, so we need to scale up the
@@ -74,6 +69,7 @@ fn setup_terrain_scene(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
+    mut ambient_light: ResMut<AmbientLight>, // Get ambient light resource
 ) {
     // Configure a properly scaled cascade shadow map for this scene (defaults are too large, mesh units are in km)
     let cascade_shadow_config = CascadeShadowConfigBuilder {
@@ -84,29 +80,36 @@ fn setup_terrain_scene(
     .build();
 
     // Sun
-    let id =commands.spawn((
+    let sun_id = commands.spawn((
         DirectionalLight {
             shadows_enabled: true,
-            illuminance: lux::RAW_SUNLIGHT,
+            illuminance: lux::RAW_SUNLIGHT, // Full sunlight illuminance
             ..default()
         },
+        // Start position doesn't matter as update_sky_center will set it
         Transform::default(),
         cascade_shadow_config,
     )).id();
 
-    let sky_center = commands.spawn((
+    // Create the SkyCenter entity
+    commands.spawn((
         SkyCenter {
-            sun: id,
-            latitude_degrees: 90.0, // Approximate latitude of New York
-            cycle_duration_secs: 10.0,
+            sun: sun_id,
+            latitude_degrees: 51.5, // Approximate latitude of London
+            planet_tilt_degrees: 23.5, // Earth's axial tilt
+            year_fraction: 0.0, // Vernal Equinox
+            cycle_duration_secs: 30.0, // A 30-second day
+            current_cycle_time: 0.0, // Start at midnight
+            // ambient_light: ambient_light_entity_id, // If you make ambient light a component
             ..default()
         },
-        Transform::default(),
-    )).id();
+        // SkyCenter doesn't need a visible transform, it just holds parameters
+        // Transform::default(), // Removed Transform
+    ));
 
     let sphere_mesh = meshes.add(Mesh::from(Sphere { radius: 1.0 }));
 
-    // light probe spheres
+    // light probe spheres (using Mesh3dBundle for convenience)
     commands.spawn((
         Mesh3d(sphere_mesh.clone()),
         MeshMaterial3d(materials.add(StandardMaterial {
@@ -129,166 +132,192 @@ fn setup_terrain_scene(
         Transform::from_xyz(-0.3, 0.1, 0.1).with_scale(Vec3::splat(0.05)),
     ));
 
+
+    // Terrain (using SceneBundle for convenience)
     commands.spawn((
-        Terrain,
-        SceneRoot(
-            asset_server.load(GltfAssetLabel::Scene(0).from_asset("terrain.glb")),
-        ),
+        SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("terrain.glb"))),
         Transform::from_xyz(-1.0, 0.0, -0.5)
             .with_scale(Vec3::splat(0.5))
             .with_rotation(Quat::from_rotation_y(PI / 2.0)),
     ));
+
+    // Add an origin marker sphere
+    commands.spawn((
+        Mesh3d(meshes.add(Sphere::new(0.02))),
+        MeshMaterial3d(materials.add(Color::srgb(1.0, 0.0, 0.0))),
+    ));
 }
 
-// fn ui_system(
-//     mut contexts: EguiContexts,
-//     mut sun_move: ResMut<SunMoveConfig>,
-//     sun_info: Res<SunInfo>,
-//     ambient_light: Res<AmbientLight>,
+
+// // System to update ambient light based on sun altitude
+// fn update_ambient_light(
+//     mut ambient_light: ResMut<AmbientLight>,
+//     q_sky_center: Query<&SkyCenter>,
+//     q_sun_transform: Query<&Transform, Without<SkyCenter>>,
 // ) {
-//     egui::Window::new("Sun Controls & Info").show(contexts.ctx_mut(), |ui| {
-//         ui.heading("Sun Parameters");
-//         ui.add(egui::Slider::new(&mut sun_move.latitude_degrees, -90.0..=90.0).text("Latitude (°)"));
-//         ui.add(egui::Slider::new(&mut sun_move.day_of_year, 1.0..=365.0).text("Day of Year"));
-//         ui.add(egui::Slider::new(&mut sun_move.axial_tilt_degrees, 0.0..=90.0).text("Axial Tilt (°)"));
-//         ui.add(egui::Slider::new(&mut sun_move.daynight_duration_secs, 1.0..=1200.0).text("Day/Night Duration (s)"));
+//     if let Ok(sky_center) = q_sky_center.single() {
+//         if let Ok(sun_transform) = q_sun_transform.get(sky_center.sun) {
+//             // Sun direction vector points from origin (observer) towards sun
+//             let sun_dir = sun_transform.translation.normalize();
 
-//         ui.separator();
+//             // Altitude is the angle above the horizon (Y component in our local frame)
+//             let altitude_rad = sun_dir.y.asin();
+//             let altitude_degrees = altitude_rad * RADIANS_TO_DEGREES;
 
-//         ui.heading("Current Sun Info");
-//         ui.label(format!("Azimuth: {:.1}°", sun_info.azimuth_rad * RADIANS_TO_DEGREES));
-//         ui.label(format!("Altitude: {:.1}°", sun_info.altitude_rad * RADIANS_TO_DEGREES));
-//         ui.label(format!("Intensity Factor: {:.3}", sun_info.intensity_factor));
+//             // Adjust ambient light based on altitude
+//             // - Below horizon (< 0 deg): minimal ambient
+//             // - Near horizon (0-10 deg): transition to daylight ambient
+//             // - Above horizon (> 10 deg): full daylight ambient
 
-//         ui.separator();
+//             // Simple lerp or stepped adjustment
+//             let day_brightness = 0.5; // Adjust based on desired look
+//             let night_brightness = 0.05; // Adjust based on desired look
 
-//         ui.heading("Current Ambient Light Info");
-//         let current_ambient_color = ambient_light.color;
-//         let current_ambient_brightness = ambient_light.brightness;
-//         let color_rgba = current_ambient_color.to_srgba();
-//         ui.label(format!(
-//             "Ambient Color (RGBA): {:.2}, {:.2}, {:.2}, {:.2}",
-//             color_rgba.red, color_rgba.green, color_rgba.blue, color_rgba.alpha
-//         ));
-//         ui.label(format!("Ambient Brightness: {:.0} Lux", current_ambient_brightness));
+//             let transition_start_alt = 0.0; // degrees
+//             let transition_end_alt = 10.0; // degrees
 
-//         // Plot Data Calculation
-//         let n_points = 100;
-//         let latitude_rad = sun_move.latitude_degrees * DEGREES_TO_RADIANS;
-//         let axial_tilt_rad = sun_move.axial_tilt_degrees * DEGREES_TO_RADIANS;
-//         let day_of_year = sun_move.day_of_year;
+//             let brightness = if altitude_degrees < transition_start_alt {
+//                 night_brightness
+//             } else if altitude_degrees > transition_end_alt {
+//                 day_brightness
+//             } else {
+//                 // Linear interpolation within transition band
+//                 let factor = (altitude_degrees - transition_start_alt) / (transition_end_alt - transition_start_alt);
+//                 night_brightness.lerp(day_brightness, factor)
+//             };
 
-//         let altitude_points: PlotPoints = (0..=n_points)
-//             .map(|i| {
-//                 let time_fraction = i as f32 / n_points as f32;
-//                 let (_, altitude_rad, _) = calculate_sun_properties(
-//                     time_fraction, latitude_rad, axial_tilt_rad, day_of_year
-//                 );
-//                 [time_fraction as f64, (altitude_rad * RADIANS_TO_DEGREES) as f64]
-//             })
-//             .collect();
+//              ambient_light.brightness = brightness;
 
-//         let azimuth_points: PlotPoints = (0..=n_points)
-//             .map(|i| {
-//                 let time_fraction = i as f32 / n_points as f32;
-//                 let (azimuth_rad, _, _) = calculate_sun_properties(
-//                     time_fraction, latitude_rad, axial_tilt_rad, day_of_year
-//                 );
-//                 [time_fraction as f64, (azimuth_rad * RADIANS_TO_DEGREES) as f64]
-//             })
-//             .collect();
-
-//         let intensity_points: PlotPoints = (0..=n_points)
-//             .map(|i| {
-//                 let time_fraction = i as f32 / n_points as f32;
-//                 let (_, _, intensity_factor) = calculate_sun_properties(
-//                     time_fraction, latitude_rad, axial_tilt_rad, day_of_year
-//                 );
-//                 [time_fraction as f64, intensity_factor as f64]
-//             })
-//             .collect();
-
-//         let ambient_brightness_points: PlotPoints = (0..=n_points)
-//             .map(|i| {
-//                 let time_fraction = i as f32 / n_points as f32;
-//                 let (_, _, intensity_factor) = calculate_sun_properties(
-//                     time_fraction, latitude_rad, axial_tilt_rad, day_of_year
-//                 );
-//                  let (_, ambient_brightness_factor) = calculate_ambient_light_properties(intensity_factor);
-//                 // Use the factor (0..1) for the plot
-//                 [time_fraction as f64, ambient_brightness_factor as f64]
-//             })
-//             .collect();
-
-//         // Ambient Color gradient (approximated for plot background)
-//         let ambient_colors: Vec<egui::Color32> = (0..=n_points)
-//             .map(|i| {
-//                 let time_fraction = i as f32 / n_points as f32;
-//                 let (_, _, intensity_factor) = calculate_sun_properties(
-//                     time_fraction, latitude_rad, axial_tilt_rad, day_of_year
-//                 );
-//                 let (color, _) = calculate_ambient_light_properties(intensity_factor);
-//                 let srgb = color.to_srgba();
-//                 egui::Color32::from_rgba_premultiplied(
-//                     (srgb.red * 255.0) as u8,
-//                     (srgb.green * 255.0) as u8,
-//                     (srgb.blue * 255.0) as u8,
-//                     (srgb.alpha * 255.0) as u8,
-//                 )
-//             })
-//             .collect();
-
-//         ui.separator();
-//         ui.heading("Sun Trajectory & Intensity Plots (vs Time Fraction)");
-
-//         let altitude_line = Line::new("Altitude (°)", altitude_points);
-//         let azimuth_line = Line::new("Azimuth (°)", azimuth_points);
-//         let intensity_line = Line::new("Sun Intensity Factor", intensity_points);
-//         Plot::new("sun_trajectory_plot")
-//             .legend(egui_plot::Legend::default())
-//             .view_aspect(2.0)
-//             .show(ui, |plot_ui| {
-//                 plot_ui.line(altitude_line);
-//                 plot_ui.line(azimuth_line);
-//             });
-
-//         Plot::new("sun_intensity_plot")
-//             .legend(egui_plot::Legend::default())
-//             .view_aspect(2.0)
-//             .show(ui, |plot_ui| {
-//                 plot_ui.line(intensity_line);
-//             });
-
-
-//         ui.separator();
-//         ui.heading("Ambient Light Plots (vs Time Fraction)");
-
-//          // Ambient Brightness Plot
-//         let ambient_brightness_line = Line::new("Ambient Brightness Factor", ambient_brightness_points);
-//         Plot::new("ambient_brightness_plot")
-//             .legend(egui_plot::Legend::default())
-//             .view_aspect(2.0)
-//             .show(ui, |plot_ui| {
-//                 plot_ui.line(ambient_brightness_line);
-//             });
-
-//         // Ambient Color Gradient Visualization
-//         ui.label("Ambient Color Gradient:");
-//         let (rect, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), 20.0), egui::Sense::hover());
-//         let painter = ui.painter();
-//         let n_colors = ambient_colors.len().max(1);
-//         for i in 0..n_colors {
-//             let t0 = i as f32 / n_colors as f32;
-//             let t1 = (i + 1) as f32 / n_colors as f32;
-//             painter.rect_filled(
-//                 egui::Rect::from_min_max(
-//                     rect.min + egui::vec2(rect.width() * t0, 0.0),
-//                     rect.min + egui::vec2(rect.width() * t1, rect.height()),
-//                 ),
-//                 0.0, // No rounding
-//                 ambient_colors[i],
-//             );
+//              // Optional: adjust ambient color slightly (e.g., warmer near horizon)
+//              // ambient_light.color = Color::WHITE; // Keep white for simplicity or change based on altitude/time of day
 //         }
-
-//     });
+//     }
 // }
+
+
+fn ui_system(
+    mut contexts: EguiContexts,
+    mut q_sky_center: Query<&mut SkyCenter>,
+    q_transform: Query<&Transform>,
+) {
+    // Use get_single_mut() which handles the case where the query is empty or has multiple results
+    let mut sky_center = match q_sky_center.get_single_mut() {
+        Ok(sc) => sc,
+        Err(_) => return, // Exit if SkyCenter entity is not found or is not unique
+    };
+
+    egui::Window::new("Sun Controls & Info").show(contexts.ctx_mut(), |ui| {
+        ui.heading("Sun Parameters");
+        ui.add(egui::Slider::new(&mut sky_center.latitude_degrees, -90.0..=90.0).text("Latitude (°)"));
+        ui.add(egui::Slider::new(&mut sky_center.planet_tilt_degrees, 0.0..=90.0).text("Planet Tilt (°)")); // Tilt usually 0-90
+        ui.add(egui::Slider::new(&mut sky_center.year_fraction, 0.0..=1.0).text("Year Fraction (0=VE, 0.25=SS, 0.5=AE, 0.75=WS)"));
+        ui.add(egui::Slider::new(&mut sky_center.cycle_duration_secs, 1.0..=120.0).text("Day/Night Duration (s)")); // Shorter max duration for faster cycles
+
+        // Option to pause/play time
+        let is_paused = sky_center.cycle_duration_secs == 0.0;
+        if ui.button(if is_paused { "Play" } else { "Pause" }).clicked() {
+            if is_paused {
+                 // Restore a default duration if paused
+                 sky_center.cycle_duration_secs = 30.0;
+                 // Ensure current_cycle_time is within bounds after unpausing
+                 sky_center.current_cycle_time %= sky_center.cycle_duration_secs.max(1.0); // Prevent division by zero
+            } else {
+                 // Store current duration before pausing
+                 // (Optional, could just set to 0.0)
+                 sky_center.cycle_duration_secs = 0.0; // Pause by setting duration to 0
+            }
+        }
+
+         if sky_center.cycle_duration_secs > 0.0 { // Only show time slider if not paused
+             let mut current_cycle_time = sky_center.current_cycle_time;
+             if ui.add(egui::Slider::new(&mut current_cycle_time, 0.0..=sky_center.cycle_duration_secs).text("Current Cycle Time (s)")).changed() {
+                 sky_center.current_cycle_time = current_cycle_time;
+             }
+         }
+
+
+        ui.separator();
+
+        // Get current sun info from its transform
+        let sun_transform = q_transform.get(sky_center.sun).ok(); // Use ok() to handle potential errors
+
+        ui.heading("Current Sun Info");
+        if let Some(sun_transform) = sun_transform {
+            let current_sun_position = sun_transform.translation.normalize(); // Normalize for direction vector
+
+            // Calculate Elevation (Altitude)
+            let elevation_rad = current_sun_position.y.asin(); // Y is up in Bevy local frame
+            let elevation_degrees = elevation_rad * RADIANS_TO_DEGREES;
+             ui.label(format!("Sun Elevation: {:.1}°", elevation_degrees));
+
+
+            // Calculate Heading (Azimuth from North towards East)
+            // Bevy's X is East, Z is North in our calculation frame
+            let heading_rad = current_sun_position.x.atan2(current_sun_position.z);
+            let mut heading_degrees = heading_rad * RADIANS_TO_DEGREES;
+            // Normalize heading to 0-360 degrees if preferred, or keep -180 to 180
+            if heading_degrees < 0.0 {
+                heading_degrees += 360.0;
+            }
+            ui.label(format!("Sun Heading (from North): {:.1}°", heading_degrees));
+
+             let hour_fraction = sky_center.current_cycle_time / sky_center.cycle_duration_secs.max(1.0); // Use max(1.0) to avoid division by zero if paused
+             let hour_of_day = hour_fraction * 24.0;
+             ui.label(format!("Time of Day: {:.2} hours", hour_of_day));
+
+
+        } else {
+             ui.label("Sun entity not found or query error.");
+        }
+
+
+        ui.separator();
+
+        // Plot Data Calculation
+        let n_points = 100;
+        let latitude_rad = sky_center.latitude_degrees * DEGREES_TO_RADIANS;
+        let axial_tilt_rad = sky_center.planet_tilt_degrees * DEGREES_TO_RADIANS;
+        let year_fraction = sky_center.year_fraction;
+
+        let mut sun_elevation_points: Vec<[f64; 2]> = Vec::new();
+        let mut sun_heading_points: Vec<[f64; 2]> = Vec::new();
+
+        for i in 0..=n_points {
+            let hour_fraction = i as f32 / n_points as f32;
+            let sun_direction = calculate_sun_direction(
+                hour_fraction,
+                latitude_rad,
+                axial_tilt_rad,
+                year_fraction,
+            );
+
+            // Elevation (Altitude) for plot
+            let elevation_rad = sun_direction.y.asin();
+            let elevation_degrees = elevation_rad * RADIANS_TO_DEGREES;
+            sun_elevation_points.push([hour_fraction as f64, elevation_degrees as f64]);
+
+            // Heading (Azimuth from North towards East) for plot
+            let heading_rad = sun_direction.x.atan2(sun_direction.z);
+            let mut heading_degrees = heading_rad * RADIANS_TO_DEGREES;
+            // Normalize heading for plot continuity if needed (-180 to 180 is fine for egui_plot default)
+            sun_heading_points.push([hour_fraction as f64, heading_degrees as f64]);
+        }
+
+        ui.separator();
+        ui.heading("Sun Trajectory (vs Day Fraction)");
+
+        let sun_elevation_line = Line::new("Elevation (°)", sun_elevation_points);
+        let sun_heading_line = Line::new("Heading (°)", sun_heading_points);
+
+        Plot::new("sun_trajectory_plot")
+            .legend(egui_plot::Legend::default())
+            .view_aspect(2.0)
+            .set_margin_fraction(egui::vec2(0.1, 0.1)) // Add some margin
+            .x_axis_label("Day Fraction (0=Mid, 0.5=Noon, 1=Mid)") // Label X axis
+            .y_axis_label("Angle (°)") // Label Y axis
+            .show(ui, |plot_ui| {
+                plot_ui.line(sun_elevation_line);
+                plot_ui.line(sun_heading_line);
+            });
+    });
+}
