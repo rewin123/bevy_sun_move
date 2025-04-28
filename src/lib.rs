@@ -111,11 +111,13 @@ pub fn calculate_sun_direction(
 
 
 fn update_sky_center(
-    mut q_sky_center: Query<&mut SkyCenter>,
+    mut q_sky_center: Query<(&mut Transform, &mut SkyCenter)>,
     mut q_sun: Query<&mut Transform, Without<SkyCenter>>,
     time: Res<Time>,
 ) {
-    for mut sky_center in q_sky_center.iter_mut() { 
+    for (mut sky_transforms, mut sky_center) in q_sky_center.iter_mut() { 
+
+
 
         // Update time
         sky_center.current_cycle_time += time.delta_secs();
@@ -126,6 +128,19 @@ fn update_sky_center(
         let latitude_rad = sky_center.latitude_degrees * DEGREES_TO_RADIANS;
         let tilt_rad = sky_center.planet_tilt_degrees * DEGREES_TO_RADIANS;
         let year_fraction = sky_center.year_fraction;
+
+        
+        sky_transforms.translation = Vec3::ZERO;
+        // Some sky sphere rotation
+        let celestial_pole_axis_local = Vec3::new(
+            0.0, // Нет компонента в направлении Восток/Запад
+            latitude_rad.sin(), // Компонент "вверх" равен sin(широты)
+            latitude_rad.cos(), // Компонент "на север" равен cos(широты)
+        );
+        
+        // Вращение небесной сферы
+        let rotation_angle_rad = PI - hour_fraction * 2.0 * PI;
+        sky_transforms.rotation = Quat::from_axis_angle(celestial_pole_axis_local, rotation_angle_rad);
 
         let sun_direction_local = calculate_sun_direction(
             hour_fraction,
