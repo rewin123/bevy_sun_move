@@ -17,7 +17,7 @@ impl Plugin for SunMovePlugin {
 
 
 #[derive(Component, Debug, Clone)]
-#[require(Transform)] /
+#[require(Transform)]
 pub struct SkyCenter {
     pub latitude_degrees: f32,
     pub planet_tilt_degrees: f32,
