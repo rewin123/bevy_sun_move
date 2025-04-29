@@ -1,15 +1,9 @@
 use std::f32::consts::PI;
 
 use bevy::{
-    core_pipeline::{bloom::Bloom, tonemapping::Tonemapping},
-    pbr::{light_consts::lux, Atmosphere, AtmosphereSettings, CascadeShadowConfigBuilder, AmbientLight},
-    prelude::*,
-    render::camera::Exposure,
-     render::mesh::{Mesh3d}, // Added missing imports
-    scene::SceneRoot, // Added missing imports
-    gltf::GltfAssetLabel, // Added missing imports
+    core_pipeline::{auto_exposure::AutoExposure, bloom::Bloom, tonemapping::Tonemapping}, gltf::GltfAssetLabel, pbr::{light_consts::lux, AmbientLight, Atmosphere, AtmosphereSettings, CascadeShadowConfigBuilder, NotShadowCaster}, prelude::*, render::{camera::Exposure, mesh::Mesh3d, render_resource::Face}, scene::SceneRoot // Added missing imports
 };
-use bevy_sun_move::*; // Your library
+use bevy_sun_move::{random_stars::*, *}; // Your library
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
 use egui_plot::{Line, Plot, PlotPoints, AxisHints}; // Added AxisHints
 
@@ -18,6 +12,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugins(SunMovePlugin) // Your plugin
+        .add_plugins(RandomStarsPlugin)
         .add_plugins(EguiPlugin {
             enable_multipass_for_primary_context: false
         })
@@ -64,12 +59,11 @@ struct Terrain;
 
 
 // Spawn same scene as in the bevy github example
-fn setup_terrain_scene(
+  fn setup_terrain_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
-    mut ambient_light: ResMut<AmbientLight>, // Get ambient light resource
 ) {
     // Configure a properly scaled cascade shadow map for this scene (defaults are too large, mesh units are in km)
     let cascade_shadow_config = CascadeShadowConfigBuilder {
@@ -97,14 +91,16 @@ fn setup_terrain_scene(
             sun: sun_id,
             latitude_degrees: 51.5, // Approximate latitude of London
             planet_tilt_degrees: 23.5, // Earth's axial tilt
-            year_fraction: 0.0, // Vernal Equinox
+            year_fraction: 0.0, 
             cycle_duration_secs: 30.0, // A 30-second day
             current_cycle_time: 0.0, // Start at midnight
-            // ambient_light: ambient_light_entity_id, // If you make ambient light a component
             ..default()
         },
-        // SkyCenter doesn't need a visible transform, it just holds parameters
-        // Transform::default(), // Removed Transform
+        Visibility::Visible,
+        StarSpawner {
+            star_count: 1000,
+            spawn_radius: 5000.0,
+        },
     ));
 
     let sphere_mesh = meshes.add(Mesh::from(Sphere { radius: 1.0 }));
@@ -148,51 +144,6 @@ fn setup_terrain_scene(
     ));
 }
 
-
-// // System to update ambient light based on sun altitude
-// fn update_ambient_light(
-//     mut ambient_light: ResMut<AmbientLight>,
-//     q_sky_center: Query<&SkyCenter>,
-//     q_sun_transform: Query<&Transform, Without<SkyCenter>>,
-// ) {
-//     if let Ok(sky_center) = q_sky_center.single() {
-//         if let Ok(sun_transform) = q_sun_transform.get(sky_center.sun) {
-//             // Sun direction vector points from origin (observer) towards sun
-//             let sun_dir = sun_transform.translation.normalize();
-
-//             // Altitude is the angle above the horizon (Y component in our local frame)
-//             let altitude_rad = sun_dir.y.asin();
-//             let altitude_degrees = altitude_rad * RADIANS_TO_DEGREES;
-
-//             // Adjust ambient light based on altitude
-//             // - Below horizon (< 0 deg): minimal ambient
-//             // - Near horizon (0-10 deg): transition to daylight ambient
-//             // - Above horizon (> 10 deg): full daylight ambient
-
-//             // Simple lerp or stepped adjustment
-//             let day_brightness = 0.5; // Adjust based on desired look
-//             let night_brightness = 0.05; // Adjust based on desired look
-
-//             let transition_start_alt = 0.0; // degrees
-//             let transition_end_alt = 10.0; // degrees
-
-//             let brightness = if altitude_degrees < transition_start_alt {
-//                 night_brightness
-//             } else if altitude_degrees > transition_end_alt {
-//                 day_brightness
-//             } else {
-//                 // Linear interpolation within transition band
-//                 let factor = (altitude_degrees - transition_start_alt) / (transition_end_alt - transition_start_alt);
-//                 night_brightness.lerp(day_brightness, factor)
-//             };
-
-//              ambient_light.brightness = brightness;
-
-//              // Optional: adjust ambient color slightly (e.g., warmer near horizon)
-//              // ambient_light.color = Color::WHITE; // Keep white for simplicity or change based on altitude/time of day
-//         }
-//     }
-// }
 
 
 fn ui_system(

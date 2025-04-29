@@ -1,7 +1,11 @@
+pub mod random_stars;
+
+
 use bevy::{
     pbr::{light_consts::lux, AmbientLight, DirectionalLight}, prelude::*
 };
 use std::f32::consts::PI;
+
 
 // Helper constants
 pub const DEGREES_TO_RADIANS: f32 = PI / 180.0;
@@ -17,7 +21,7 @@ impl Plugin for SunMovePlugin {
 
 
 #[derive(Component, Debug, Clone)]
-#[require(Transform)]
+#[require(Transform, Visibility)]
 pub struct SkyCenter {
     pub latitude_degrees: f32,
     pub planet_tilt_degrees: f32,
