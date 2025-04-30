@@ -159,7 +159,7 @@ The update_sky_center system will automatically run in the Update schedule, adva
 # Components and Resources
 `SkyCenter`
 
-A component added to anentity (a dedicated sky entity) that defines the parameters of the sky simulation.
+A component added to entity (a dedicated sky entity) that defines the parameters of the sky simulation.
 - latitude_degrees: Observer's latitude in degrees (-90 to 90).
 - planet_tilt_degrees: Axial tilt of the planet in degrees. 
 - year_fraction: Fraction of the year (0.0 to 1.0), where 0.0 is Vernal Equinox, 0.25 is Summer Solstice, 0.5 is Autumnal Equinox, 0.75 is Winter Solstice (for positive tilt).
