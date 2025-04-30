@@ -182,6 +182,6 @@ Contributions are welcome! Feel free to open issues or pull requests on the GitH
 
 # License
 
-This project is licensed under the MIT license (or similar, specify your license choice).
+This project is licensed under the MIT license.
 
 
