@@ -1,3 +1,7 @@
+
+![exact_location](https://github.com/user-attachments/assets/bb9b08fe-beb6-47d3-b544-576fe5c83156)
+
+
 # bevy_sun_move
 
 A Bevy plugin for simulating realistic sun movement, integrating well with Bevy's `Atmosphere` and PBR lighting.
