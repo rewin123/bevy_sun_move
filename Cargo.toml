@@ -5,6 +5,8 @@ edition = "2024"
 
 [dependencies]
 bevy = "0.16"
+rand = "0.9.1"
+
+[dev-dependencies]
 bevy_egui = "0.34"
 egui_plot = "0.32.1"
-rand = "0.9.1"

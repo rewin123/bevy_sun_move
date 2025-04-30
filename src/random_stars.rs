@@ -1,3 +1,7 @@
+// Its definetely not the best way to do this, better to use a texture or some particle system
+// So this is just for testing purposes
+
+
 use bevy::{pbr::NotShadowCaster, prelude::*};
 use rand::Rng;
 
