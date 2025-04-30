@@ -286,12 +286,8 @@ fn ui_system(
             let sun_transform_actual = q_sun_transform.get(sky_center.sun).ok();
 
 
-            if let Some(sun_transform) = sun_transform_actual { // Start of sun_transform_actual block
-
-                 // DirectionalLight direction is -Transform.local_z().
-                 // The vector FROM the origin TOWARDS the light is Transform.translation.
-                 // This translation vector IS the sun direction vector from the observer.
-                 let current_sun_direction = sun_transform.translation.normalize(); // Normalize for clarity
+            if let Some(sun_transform) = sun_transform_actual { 
+                 let current_sun_direction = sun_transform.translation.normalize(); 
 
                  let elevation_rad = current_sun_direction.y.asin(); // Y is Up
                  let elevation_degrees = elevation_rad * RADIANS_TO_DEGREES;
@@ -350,9 +346,9 @@ fn ui_system(
                           plot_ui.line(sun_heading_line);
                       });
 
-            } else { // else for sun_transform_actual
+            } else {
                 ui.label("Sun entity transform not found.");
-            } // End of sun_transform_actual block
+            } 
 
         } else { 
             ui.label("SkyCenter component not active yet. Apply config first.");
