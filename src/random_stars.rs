@@ -16,7 +16,6 @@ impl Plugin for RandomStarsPlugin {
     }
 }
 
-
 #[derive(Component)]
 pub struct StarSpawner {
     pub star_count: u32,
@@ -70,13 +69,16 @@ fn on_change_spawner(
             let y = star_spawner.spawn_radius * theta.cos();
             let z = star_spawner.spawn_radius * theta.sin() * phi.sin();
 
-            let id = commands.spawn((
-                Star,
-                Transform::from_xyz(x, y, z).with_scale(Vec3::ONE * star_spawner.spawn_radius / 500.0),
-                Mesh3d(star_spawner_cache.mesh.clone()),
-                MeshMaterial3d(star_spawner_cache.material.clone()),
-                NotShadowCaster
-            )).id();
+            let id = commands
+                .spawn((
+                    Star,
+                    Transform::from_xyz(x, y, z)
+                        .with_scale(Vec3::ONE * star_spawner.spawn_radius / 500.0),
+                    Mesh3d(star_spawner_cache.mesh.clone()),
+                    MeshMaterial3d(star_spawner_cache.material.clone()),
+                    NotShadowCaster,
+                ))
+                .id();
 
             commands.entity(entity).add_child(id);
         }
@@ -101,7 +103,7 @@ fn update_star_illuminance(
 
     let day_illuminance = 0.0;
     let day_point = 0.1;
-    
+
     let night_illuminance = 1.0;
     let night_point = -0.1;
 
@@ -110,6 +112,6 @@ fn update_star_illuminance(
 
     let illuminance = night_illuminance + sun_height * (day_illuminance - night_illuminance);
 
-    
-    materials.get_mut(cache.material.id()).unwrap().emissive = LinearRgba::rgb(illuminance, illuminance, illuminance);
+    materials.get_mut(cache.material.id()).unwrap().emissive =
+        LinearRgba::rgb(illuminance, illuminance, illuminance);
 }

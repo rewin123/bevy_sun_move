@@ -1,22 +1,27 @@
 use std::f32::consts::PI;
 
 use bevy::{
-    core_pipeline::{auto_exposure::AutoExposure, bloom::Bloom, tonemapping::Tonemapping}, gltf::GltfAssetLabel, pbr::{light_consts::lux, AmbientLight, Atmosphere, AtmosphereSettings, CascadeShadowConfigBuilder, NotShadowCaster}, prelude::*, render::{camera::Exposure, mesh::Mesh3d, render_resource::Face}, scene::SceneRoot
+    core_pipeline::{auto_exposure::AutoExposure, bloom::Bloom, tonemapping::Tonemapping},
+    gltf::GltfAssetLabel,
+    pbr::{
+        AmbientLight, Atmosphere, AtmosphereSettings, CascadeShadowConfigBuilder, NotShadowCaster,
+        light_consts::lux,
+    },
+    prelude::*,
+    render::{camera::Exposure, mesh::Mesh3d, render_resource::Face},
+    scene::SceneRoot,
 };
-use bevy_sun_move::{
-    random_stars::*, *
-};
-use bevy_egui::{egui, EguiContexts, EguiPlugin};
+use bevy_egui::{EguiContexts, EguiPlugin, egui};
+use bevy_sun_move::{random_stars::*, *};
 use egui_plot::{Line, Plot, PlotPoints};
-
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_plugins(SunMovePlugin) 
+        .add_plugins(SunMovePlugin)
         .add_plugins(RandomStarsPlugin)
         .add_plugins(EguiPlugin {
-            enable_multipass_for_primary_context: false
+            enable_multipass_for_primary_context: false,
         })
         .add_systems(Startup, (setup_camera_fog, setup_terrain_scene))
         .add_systems(Update, ui_system)
@@ -46,8 +51,7 @@ fn setup_camera_fog(mut commands: Commands) {
 #[derive(Component)]
 struct Terrain;
 
-
-  fn setup_terrain_scene(
+fn setup_terrain_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -61,21 +65,23 @@ struct Terrain;
     .build();
 
     // Солнце
-    let sun_id = commands.spawn((
-        DirectionalLight {
-            shadows_enabled: true,
-            illuminance: lux::RAW_SUNLIGHT, 
-            ..default()
-        },
-        Transform::default(),
-        cascade_shadow_config,
-    )).id();
+    let sun_id = commands
+        .spawn((
+            DirectionalLight {
+                shadows_enabled: true,
+                illuminance: lux::RAW_SUNLIGHT,
+                ..default()
+            },
+            Transform::default(),
+            cascade_shadow_config,
+        ))
+        .id();
 
     let sky_config = TimedSkyConfig {
         sun_entity: sun_id,
         planet_tilt_degrees: 23.5, // Earth tilt
-        day_duration_secs: 10.0,  
-        night_duration_secs: 10.0, 
+        day_duration_secs: 10.0,
+        night_duration_secs: 10.0,
         max_sun_height_deg: 45.0, // Usual value for pretty shadow in middle of the day
     };
 
@@ -86,7 +92,7 @@ struct Terrain;
         Visibility::Visible,
         StarSpawner {
             star_count: 1000,
-            spawn_radius: 5000.0, 
+            spawn_radius: 5000.0,
         },
     ));
 
@@ -114,7 +120,6 @@ struct Terrain;
         Transform::from_xyz(-0.3, 0.1, 0.1).with_scale(Vec3::splat(0.05)),
     ));
 
-
     commands.spawn((
         SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("terrain.glb"))),
         Transform::from_xyz(-1.0, 0.0, -0.5)
@@ -128,17 +133,16 @@ struct Terrain;
     ));
 }
 
-
 // --- Система UI ---
 fn ui_system(
     mut contexts: EguiContexts,
-    mut commands: Commands, 
+    mut commands: Commands,
     mut q_sky_entity: Query<(Entity, &mut TimedSkyConfig, Option<&mut SkyCenter>)>,
     q_sun_transform: Query<&Transform, Without<SkyCenter>>,
 ) {
     let (entity, mut timed_config, mut sky_center_option) = match q_sky_entity.get_single_mut() {
         Ok(data) => data,
-        Err(_) => return, 
+        Err(_) => return,
     };
 
     egui::Window::new("Sky Cycle Settings").show(contexts.ctx_mut(), |ui| {
@@ -354,5 +358,5 @@ fn ui_system(
             ui.label("SkyCenter component not active yet. Apply config first.");
         } 
 
-    }); 
-} 
+    });
+}

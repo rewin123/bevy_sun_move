@@ -1,12 +1,19 @@
 use std::f32::consts::PI;
 
 use bevy::{
-    core_pipeline::{auto_exposure::AutoExposure, bloom::Bloom, tonemapping::Tonemapping}, gltf::GltfAssetLabel, pbr::{light_consts::lux, AmbientLight, Atmosphere, AtmosphereSettings, CascadeShadowConfigBuilder, NotShadowCaster}, prelude::*, render::{camera::Exposure, mesh::Mesh3d, render_resource::Face}, scene::SceneRoot // Added missing imports
+    core_pipeline::{auto_exposure::AutoExposure, bloom::Bloom, tonemapping::Tonemapping},
+    gltf::GltfAssetLabel,
+    pbr::{
+        AmbientLight, Atmosphere, AtmosphereSettings, CascadeShadowConfigBuilder, NotShadowCaster,
+        light_consts::lux,
+    },
+    prelude::*,
+    render::{camera::Exposure, mesh::Mesh3d, render_resource::Face},
+    scene::SceneRoot, // Added missing imports
 };
+use bevy_egui::{EguiContexts, EguiPlugin, egui};
 use bevy_sun_move::{random_stars::*, *}; // Your library
-use bevy_egui::{egui, EguiContexts, EguiPlugin};
-use egui_plot::{Line, Plot, PlotPoints, AxisHints}; // Added AxisHints
-
+use egui_plot::{AxisHints, Line, Plot, PlotPoints}; // Added AxisHints
 
 fn main() {
     App::new()
@@ -14,7 +21,7 @@ fn main() {
         .add_plugins(SunMovePlugin) // Your plugin
         .add_plugins(RandomStarsPlugin)
         .add_plugins(EguiPlugin {
-            enable_multipass_for_primary_context: false
+            enable_multipass_for_primary_context: false,
         })
         .add_systems(Startup, (setup_camera_fog, setup_terrain_scene))
         .add_systems(Update, ui_system)
@@ -45,9 +52,8 @@ fn setup_camera_fog(mut commands: Commands) {
 #[derive(Component)]
 struct Terrain;
 
-
 // Spawn scene similar to the bevy github example
-  fn setup_terrain_scene(
+fn setup_terrain_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -62,26 +68,28 @@ struct Terrain;
     .build();
 
     // Sun
-    let sun_id = commands.spawn((
-        DirectionalLight {
-            shadows_enabled: true,
-            illuminance: lux::RAW_SUNLIGHT, // Full sunlight illuminance
-            ..default()
-        },
-        // Start position doesn't matter as update_sky_center will set it
-        Transform::default(),
-        cascade_shadow_config,
-    )).id();
+    let sun_id = commands
+        .spawn((
+            DirectionalLight {
+                shadows_enabled: true,
+                illuminance: lux::RAW_SUNLIGHT, // Full sunlight illuminance
+                ..default()
+            },
+            // Start position doesn't matter as update_sky_center will set it
+            Transform::default(),
+            cascade_shadow_config,
+        ))
+        .id();
 
     // -- Create the SkyCenter entity
     commands.spawn((
         SkyCenter {
             sun: sun_id,
-            latitude_degrees: 51.5, // Approximate latitude of London
+            latitude_degrees: 51.5,    // Approximate latitude of London
             planet_tilt_degrees: 23.5, // Earth's axial tilt
-            year_fraction: 0.0, 
+            year_fraction: 0.0,
             cycle_duration_secs: 30.0, // A 30-second day
-            current_cycle_time: 0.0, // Start at midnight
+            current_cycle_time: 0.0,   // Start at midnight
             ..default()
         },
         Visibility::Visible,
@@ -116,7 +124,6 @@ struct Terrain;
         Transform::from_xyz(-0.3, 0.1, 0.1).with_scale(Vec3::splat(0.05)),
     ));
 
-
     // Terrain (using SceneBundle for convenience)
     commands.spawn((
         SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("terrain.glb"))),
@@ -132,8 +139,6 @@ struct Terrain;
     ));
 }
 
-
-
 fn ui_system(
     mut contexts: EguiContexts,
     mut q_sky_center: Query<&mut SkyCenter>,
@@ -141,49 +146,71 @@ fn ui_system(
 ) {
     let mut sky_center = match q_sky_center.get_single_mut() {
         Ok(sc) => sc,
-        Err(_) => return, 
+        Err(_) => return,
     };
 
     egui::Window::new("Sun Controls & Info").show(contexts.ctx_mut(), |ui| {
         ui.heading("Sun Parameters");
-        ui.add(egui::Slider::new(&mut sky_center.latitude_degrees, -90.0..=90.0).text("Latitude (°)"));
-        ui.add(egui::Slider::new(&mut sky_center.planet_tilt_degrees, 0.0..=90.0).text("Planet Tilt (°)")); // Tilt usually 0-90
-        ui.add(egui::Slider::new(&mut sky_center.year_fraction, 0.0..=1.0).text("Year Fraction (0=VE, 0.25=SS, 0.5=AE, 0.75=WS)"));
-        ui.add(egui::Slider::new(&mut sky_center.cycle_duration_secs, 1.0..=120.0).text("Day/Night Duration (s)")); // Shorter max duration for faster cycles
+        ui.add(
+            egui::Slider::new(&mut sky_center.latitude_degrees, -90.0..=90.0).text("Latitude (°)"),
+        );
+        ui.add(
+            egui::Slider::new(&mut sky_center.planet_tilt_degrees, 0.0..=90.0)
+                .text("Planet Tilt (°)"),
+        ); // Tilt usually 0-90
+        ui.add(
+            egui::Slider::new(&mut sky_center.year_fraction, 0.0..=1.0)
+                .text("Year Fraction (0=VE, 0.25=SS, 0.5=AE, 0.75=WS)"),
+        );
+        ui.add(
+            egui::Slider::new(&mut sky_center.cycle_duration_secs, 1.0..=120.0)
+                .text("Day/Night Duration (s)"),
+        ); // Shorter max duration for faster cycles
 
         // Option to pause/play time
         let is_paused = sky_center.cycle_duration_secs == 0.0;
-        if ui.button(if is_paused { "Play" } else { "Pause" }).clicked() {
+        if ui
+            .button(if is_paused { "Play" } else { "Pause" })
+            .clicked()
+        {
             if is_paused {
-                 sky_center.cycle_duration_secs = 30.0;
-                 sky_center.current_cycle_time %= sky_center.cycle_duration_secs.max(1.0); 
+                sky_center.cycle_duration_secs = 30.0;
+                sky_center.current_cycle_time %= sky_center.cycle_duration_secs.max(1.0);
             } else {
-                 sky_center.cycle_duration_secs = 0.0; 
+                sky_center.cycle_duration_secs = 0.0;
             }
         }
 
-         if sky_center.cycle_duration_secs > 0.0 { // Only show time slider if not paused
-             let mut current_cycle_time = sky_center.current_cycle_time;
-             if ui.add(egui::Slider::new(&mut current_cycle_time, 0.0..=sky_center.cycle_duration_secs).text("Current Cycle Time (s)")).changed() {
-                 sky_center.current_cycle_time = current_cycle_time;
-             }
-         }
-
+        if sky_center.cycle_duration_secs > 0.0 {
+            // Only show time slider if not paused
+            let mut current_cycle_time = sky_center.current_cycle_time;
+            if ui
+                .add(
+                    egui::Slider::new(
+                        &mut current_cycle_time,
+                        0.0..=sky_center.cycle_duration_secs,
+                    )
+                    .text("Current Cycle Time (s)"),
+                )
+                .changed()
+            {
+                sky_center.current_cycle_time = current_cycle_time;
+            }
+        }
 
         ui.separator();
 
         // Get current sun info from its transform
-        let sun_transform = q_transform.get(sky_center.sun).ok(); 
+        let sun_transform = q_transform.get(sky_center.sun).ok();
 
         ui.heading("Current Sun Info");
         if let Some(sun_transform) = sun_transform {
-            let current_sun_position = sun_transform.translation.normalize(); 
+            let current_sun_position = sun_transform.translation.normalize();
 
             // Calculate Elevation (Altitude)
-            let elevation_rad = current_sun_position.y.asin(); 
+            let elevation_rad = current_sun_position.y.asin();
             let elevation_degrees = elevation_rad * RADIANS_TO_DEGREES;
-             ui.label(format!("Sun Elevation: {:.1}°", elevation_degrees));
-
+            ui.label(format!("Sun Elevation: {:.1}°", elevation_degrees));
 
             // Calculate Heading (Azimuth from North towards East)
             // Bevy's X is East, Z is North in our calculation frame
@@ -195,15 +222,13 @@ fn ui_system(
             }
             ui.label(format!("Sun Heading (from North): {:.1}°", heading_degrees));
 
-             let hour_fraction = sky_center.current_cycle_time / sky_center.cycle_duration_secs.max(1.0); // Use max(1.0) to avoid division by zero if paused
-             let hour_of_day = hour_fraction * 24.0;
-             ui.label(format!("Time of Day: {:.2} hours", hour_of_day));
-
-
+            let hour_fraction =
+                sky_center.current_cycle_time / sky_center.cycle_duration_secs.max(1.0); // Use max(1.0) to avoid division by zero if paused
+            let hour_of_day = hour_fraction * 24.0;
+            ui.label(format!("Time of Day: {:.2} hours", hour_of_day));
         } else {
-             ui.label("Sun entity not found or query error.");
+            ui.label("Sun entity not found or query error.");
         }
-
 
         ui.separator();
 
@@ -218,12 +243,8 @@ fn ui_system(
 
         for i in 0..=n_points {
             let hour_fraction = i as f32 / n_points as f32;
-            let sun_direction = calculate_sun_direction(
-                hour_fraction,
-                latitude_rad,
-                axial_tilt_rad,
-                year_fraction,
-            );
+            let sun_direction =
+                calculate_sun_direction(hour_fraction, latitude_rad, axial_tilt_rad, year_fraction);
 
             // Elevation (Altitude) for plot
             let elevation_rad = sun_direction.y.asin();
@@ -255,4 +276,3 @@ fn ui_system(
             });
     });
 }
-
