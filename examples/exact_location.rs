@@ -1,19 +1,19 @@
 use std::f32::consts::PI;
 
 use bevy::{
-    core_pipeline::{auto_exposure::AutoExposure, bloom::Bloom, tonemapping::Tonemapping},
+    core_pipeline::{bloom::Bloom, tonemapping::Tonemapping},
     gltf::GltfAssetLabel,
     pbr::{
-        AmbientLight, Atmosphere, AtmosphereSettings, CascadeShadowConfigBuilder, NotShadowCaster,
+        Atmosphere, AtmosphereSettings, CascadeShadowConfigBuilder,
         light_consts::lux,
     },
     prelude::*,
-    render::{camera::Exposure, mesh::Mesh3d, render_resource::Face},
+    render::{camera::Exposure, mesh::Mesh3d},
     scene::SceneRoot, // Added missing imports
 };
 use bevy_egui::{EguiContexts, EguiPlugin, egui};
 use bevy_sun_move::{random_stars::*, *}; // Your library
-use egui_plot::{AxisHints, Line, Plot, PlotPoints}; // Added AxisHints
+use egui_plot::{Line, Plot}; // Added AxisHints
 
 fn main() {
     App::new()
@@ -144,7 +144,7 @@ fn ui_system(
     mut q_sky_center: Query<&mut SkyCenter>,
     q_transform: Query<&Transform>,
 ) {
-    let mut sky_center = match q_sky_center.get_single_mut() {
+    let mut sky_center = match q_sky_center.single_mut() {
         Ok(sc) => sc,
         Err(_) => return,
     };
@@ -253,7 +253,7 @@ fn ui_system(
 
             // Heading (Azimuth from North towards East) for plot
             let heading_rad = sun_direction.x.atan2(sun_direction.z);
-            let mut heading_degrees = heading_rad * RADIANS_TO_DEGREES;
+            let heading_degrees = heading_rad * RADIANS_TO_DEGREES;
             // Normalize heading for plot continuity if needed (-180 to 180 is fine for egui_plot default)
             sun_heading_points.push([hour_fraction as f64, heading_degrees as f64]);
         }

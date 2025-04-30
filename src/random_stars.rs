@@ -1,4 +1,4 @@
-use bevy::{core_pipeline::auto_exposure::AutoExposurePlugin, pbr::NotShadowCaster, prelude::*};
+use bevy::{pbr::NotShadowCaster, prelude::*};
 use rand::Rng;
 
 use crate::SkyCenter;
@@ -50,9 +50,8 @@ fn on_change_spawner(
     mut q_star_spawner: Query<(Entity, &mut StarSpawner, Option<&Children>), Changed<StarSpawner>>,
     q_star: Query<Entity, With<Star>>,
     star_spawner_cache: Res<StarSpawnerCache>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    for (entity, mut star_spawner, children) in q_star_spawner.iter_mut() {
+    for (entity, star_spawner, children) in q_star_spawner.iter_mut() {
         if let Some(children) = children {
             for star in children.iter() {
                 if q_star.contains(star) {
@@ -86,12 +85,12 @@ fn on_change_spawner(
 }
 
 fn update_star_illuminance(
-    mut cache: ResMut<StarSpawnerCache>,
+    cache: Res<StarSpawnerCache>,
     q_sky_center: Query<&SkyCenter>,
     q_transforms: Query<&Transform>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let Ok(sky_center) = q_sky_center.get_single() else {
+    let Ok(sky_center) = q_sky_center.single() else {
         return;
     };
 

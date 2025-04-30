@@ -1,9 +1,6 @@
 pub mod random_stars;
 
-use bevy::{
-    pbr::{AmbientLight, DirectionalLight, light_consts::lux},
-    prelude::*,
-};
+use bevy::prelude::*;
 use std::f32::consts::PI;
 
 // Helper constants
@@ -61,6 +58,7 @@ impl Default for TimedSkyConfig {
 /// Returns `None` if the requested parameters are impossible for the given tilt
 /// (e.g., max height too high/low for the day length, or required declination
 /// exceeds the planet tilt).
+#[allow(non_snake_case)]
 pub fn calculate_latitude_yearfraction(
     planet_tilt_degrees: f32,
     day_duration_secs: f32,
@@ -215,7 +213,7 @@ pub fn calculate_latitude_yearfraction(
     }
 
     let beta = term_for_cos_sum.clamp(-1.0, 1.0).acos(); // angle for lat + dec
-    let alpha = (PI / 2.0 - max_height_rad); // angle for |lat - dec| (zenith distance at noon)
+    let alpha = PI / 2.0 - max_height_rad; // angle for |lat - dec| (zenith distance at noon)
 
     // Note: cos(lat-dec) = sin(h) implies |lat-dec| = PI/2 - h for h in [0, PI/2]
     // The sign of (lat-dec) determines if sun culminates South (+ve) or North (-ve) of zenith.
@@ -238,15 +236,6 @@ pub fn calculate_latitude_yearfraction(
 
     let mut found_lat_rad = None;
     let mut found_dec_rad = None;
-
-    // We prefer the solution where lat and dec signs align with the day length expectation
-    // (same sign for long day, opposite sign for short day), assuming a positive latitude hemisphere.
-    let target_lat_sign = planet_tilt_degrees.signum(); // Assume positive tilt means NH focus, negative tilt SH focus
-    let target_dec_sign = if day_fraction > 0.5 {
-        target_lat_sign
-    } else {
-        -target_lat_sign
-    };
 
     for (lat_candidate, dec_candidate) in candidates.iter() {
         let lat_deg = lat_candidate * RADIANS_TO_DEGREES;
@@ -401,7 +390,7 @@ impl SkyCenter {
             timed_config.max_sun_height_deg,
         );
 
-        if let Some((latitude, year_fraction, declination)) = calc {
+        if let Some((latitude, year_fraction, _)) = calc {
             Some(Self {
                 latitude_degrees: latitude,
                 planet_tilt_degrees: timed_config.planet_tilt_degrees,
@@ -417,6 +406,7 @@ impl SkyCenter {
         }
     }
 
+    #[allow(dead_code)]
     fn update_from_timed_config(&mut self, timed_config: &TimedSkyConfig) {
         let calc = calculate_latitude_yearfraction(
             timed_config.planet_tilt_degrees,
@@ -425,7 +415,7 @@ impl SkyCenter {
             timed_config.max_sun_height_deg,
         );
 
-        if let Some((latitude, year_fraction, declination)) = calc {
+        if let Some((latitude, year_fraction, _)) = calc {
             self.latitude_degrees = latitude;
             self.year_fraction = year_fraction;
             self.cycle_duration_secs =
@@ -479,7 +469,6 @@ pub fn calculate_sun_direction(
     // Y (up) component = sin(altitude)
     let sin_alt = latitude_rad.sin() * dec_rad.sin()
         + latitude_rad.cos() * dec_rad.cos() * local_hour_angle_rad.cos();
-    let alt_rad = sin_alt.asin(); // Altitude, angle from horizon
 
     // X (east) component = cos(altitude) * sin(azimuth from North towards East)
     // Z (north) component = cos(altitude) * cos(azimuth from North towards East)

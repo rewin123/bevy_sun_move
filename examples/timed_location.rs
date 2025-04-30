@@ -1,19 +1,19 @@
 use std::f32::consts::PI;
 
 use bevy::{
-    core_pipeline::{auto_exposure::AutoExposure, bloom::Bloom, tonemapping::Tonemapping},
+    core_pipeline::{bloom::Bloom, tonemapping::Tonemapping},
     gltf::GltfAssetLabel,
     pbr::{
-        AmbientLight, Atmosphere, AtmosphereSettings, CascadeShadowConfigBuilder, NotShadowCaster,
+        Atmosphere, AtmosphereSettings, CascadeShadowConfigBuilder,
         light_consts::lux,
     },
     prelude::*,
-    render::{camera::Exposure, mesh::Mesh3d, render_resource::Face},
+    render::{camera::Exposure, mesh::Mesh3d},
     scene::SceneRoot,
 };
 use bevy_egui::{EguiContexts, EguiPlugin, egui};
 use bevy_sun_move::{random_stars::*, *};
-use egui_plot::{Line, Plot, PlotPoints};
+use egui_plot::{Line, Plot};
 
 fn main() {
     App::new()
@@ -140,7 +140,7 @@ fn ui_system(
     mut q_sky_entity: Query<(Entity, &mut TimedSkyConfig, Option<&mut SkyCenter>)>,
     q_sun_transform: Query<&Transform, Without<SkyCenter>>,
 ) {
-    let (entity, mut timed_config, mut sky_center_option) = match q_sky_entity.get_single_mut() {
+    let (entity, mut timed_config, mut sky_center_option) = match q_sky_entity.single_mut() {
         Ok(data) => data,
         Err(_) => return,
     };
@@ -182,7 +182,7 @@ fn ui_system(
                      current_cycle_time: 0.0, // Reset time to midnight when applying
                  };
 
-                 if let Some(mut sky_center) = sky_center_option.as_mut() {
+                 if let Some(sky_center) = sky_center_option.as_mut() {
                     // Rewrite the existing SkyCenter
                     sky_center.latitude_degrees = lat;
                     sky_center.planet_tilt_degrees = timed_config.planet_tilt_degrees;
