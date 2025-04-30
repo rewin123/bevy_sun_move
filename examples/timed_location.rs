@@ -7,7 +7,7 @@ use bevy::{
 };
 // Импортируем все необходимое из вашей библиотеки, включая вспомогательные функции и компоненты
 use bevy_sun_move::{
-    calculate_sun_direction, calculate_timed_sky_center_params, random_stars::*, SkyCenter, SunMovePlugin, TimedSkyCenter, DEGREES_TO_RADIANS, RADIANS_TO_DEGREES
+    random_stars::*, *
 };
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
 use egui_plot::{Line, Plot, PlotPoints};
@@ -77,25 +77,24 @@ struct Terrain;
         cascade_shadow_config,
     )).id();
 
+    let sky_config = TimedSkyConfig {
+        sun_entity: sun_id,
+        planet_tilt_degrees: 23.5, // Earth tilt
+        day_duration_secs: 10.0,  
+        night_duration_secs: 10.0, 
+        max_sun_height_deg: 45.0, // Usual value for pretty shadow in middle of the day
+    };
+
     // Спавним сущность с TimedSkyCenter и базовыми компонентами, необходимыми для SkyCenter
     commands.spawn((
-        TimedSkyCenter {
-            sun: sun_id,
-            planet_tilt_degrees: 23.5, // Начальное значение
-            day_duration_secs: 20.0,   // Начальное значение
-            night_duration_secs: 10.0,  // Начальное значение
-        },
-        // Добавляем обязательные компоненты для SkyCenter, даже если он не присутствует изначально.
-        // Система UI добавит SkyCenter позже.
+        sky_config.clone(),
+        SkyCenter::from_timed_config(&sky_config).unwrap(),
         Transform::default(),
         Visibility::Visible,
-        // Добавляем StarSpawner здесь
         StarSpawner {
             star_count: 1000,
             spawn_radius: 5000.0, // Звезды должны быть очень далеко
         },
-        // Опционально: добавьте маркерный компонент или имя, если у вас есть несколько таких сущностей
-        // MySkyEntity,
     ));
 
     let sphere_mesh = meshes.add(Mesh::from(Sphere { radius: 1.0 }));
@@ -143,152 +142,178 @@ struct Terrain;
 // --- Система UI ---
 fn ui_system(
     mut contexts: EguiContexts,
-    mut commands: Commands, // Нужны команды для удаления/вставки компонентов
-    // Запрашиваем сущность, которая может иметь TimedSkyCenter или SkyCenter
-    // Используем Option<&mut SkyCenter>, чтобы иметь возможность изменять его, если он присутствует
-    mut q_sky_entity: Query<(Entity, &mut TimedSkyCenter, Option<&mut SkyCenter>)>,
-    // Запрашиваем трансформацию сущности солнца отдельно, так как она нужна внутри вложенного блока
+    mut commands: Commands, // Need commands to remove/insert components
+    // Query for the entity that should have the sky components.
+    // It must have TimedSkyConfig for the UI, and *may* have SkyCenter if active.
+    mut q_sky_entity: Query<(Entity, &mut TimedSkyConfig, Option<&mut SkyCenter>)>,
+    // Query for the sun entity's transform separately
     q_sun_transform: Query<&Transform, Without<SkyCenter>>,
 ) {
-    // Используем get_single_mut(), который обрабатывает случай, когда запрос пуст или имеет несколько результатов
+    // Use get_single_mut() to handle the case where the query is empty or not unique
     let (entity, mut timed_config, sky_center_option) = match q_sky_entity.get_single_mut() {
         Ok(data) => data,
-        Err(_) => return, // Выходим, если сущность не найдена или не уникальна
+        Err(_) => return, // Exit if entity not found or not unique
     };
 
     egui::Window::new("Sky Cycle Settings").show(contexts.ctx_mut(), |ui| {
-        ui.heading("Timed Sky Center Settings");
-        ui.label("Configure desired day/night durations. Applies to Summer Solstice.");
+        ui.heading("Timed Sky Config");
+        ui.label("Configure desired day/night durations and max sun height.");
 
         ui.add(egui::Slider::new(&mut timed_config.planet_tilt_degrees, 0.0..=90.0).text("Planet Tilt (°)"));
-        ui.add(egui::Slider::new(&mut timed_config.day_duration_secs, 0.1..=120.0).text("Desired Day Duration (s)")); // Предотвращаем 0 длительность в слайдере
-        ui.add(egui::Slider::new(&mut timed_config.night_duration_secs, 0.1..=120.0).text("Desired Night Duration (s)")); // Предотвращаем 0 длительность в слайдере
+        ui.add(egui::Slider::new(&mut timed_config.day_duration_secs, 0.0..=120.0).text("Desired Day Duration (s)"));
+        ui.add(egui::Slider::new(&mut timed_config.night_duration_secs, 0.0..=120.0).text("Desired Night Duration (s)"));
+        ui.add(egui::Slider::new(&mut timed_config.max_sun_height_deg, 0.0..=90.0).text("Desired Max Sun Height (°)")); // New slider
 
         ui.separator();
 
-        // Рассчитываем *потенциальные* результирующие параметры на основе текущих значений TimedSkyCenter
-        let calculated_params = calculate_timed_sky_center_params(
+        // Calculate *potential* resulting parameters based on current TimedSkyConfig values
+        let calculation_result = calculate_latitude_yearfraction(
             timed_config.planet_tilt_degrees,
             timed_config.day_duration_secs,
             timed_config.night_duration_secs,
+            timed_config.max_sun_height_deg,
         );
 
-        ui.heading("Calculated Parameters (Summer Solstice)");
-        if let Some((lat, year)) = calculated_params {
-             ui.label(format!("Required Latitude: {:.2}°", lat));
-             ui.label(format!("Required Year Fraction: {:.2}", year));
-             ui.label(format!("Total Cycle Duration: {:.2} s", timed_config.day_duration_secs + timed_config.night_duration_secs));
+        ui.heading("Calculated Parameters");
+        if let Some((lat, year, dec)) = calculation_result {
+             ui.label(egui::RichText::new(format!("Required Latitude: {:.2}°", lat)).size(18.0));
+             ui.label(egui::RichText::new(format!("Resulting Declination: {:.2}°", dec)).size(18.0));
+             ui.label(egui::RichText::new(format!("Required Year Fraction: {:.4}", year)).size(18.0));
+             ui.label(egui::RichText::new(format!("Total Cycle Duration: {:.2} s", timed_config.day_duration_secs + timed_config.night_duration_secs)).size(18.0));
 
-             if ui.button("Apply Timed Settings").clicked() {
+             if ui.button("Apply Config").clicked() {
                  let total_duration = timed_config.day_duration_secs + timed_config.night_duration_secs;
                  let new_sky_center = SkyCenter {
                      latitude_degrees: lat,
-                     planet_tilt_degrees: timed_config.planet_tilt_degrees,
+                     planet_tilt_degrees: timed_config.planet_tilt_degrees, // Use configured tilt
                      year_fraction: year,
                      cycle_duration_secs: total_duration,
-                     sun: timed_config.sun,
-                     current_cycle_time: 0.0, // Сбрасываем время на полночь при применении
+                     sun: timed_config.sun_entity,
+                     current_cycle_time: 0.0, // Reset time to midnight when applying
                  };
 
-                 // Удаляем старый SkyCenter, если он существует
+                 // Remove the old SkyCenter if it exists
                  commands.entity(entity).remove::<SkyCenter>();
-                 // Вставляем новый SkyCenter
+                 // Insert the new SkyCenter
                  commands.entity(entity).insert(new_sky_center);
 
-                 info!("Applied new SkyCenter settings: Lat {:.2}°, Year Frac {:.2}, Cycle {:.2}s", lat, year, total_duration);
+                 info!("Applied new SkyCenter settings: Lat {:.2}°, Dec {:.2}°, YF {:.4}, Cycle {:.2}s", lat, dec, year, total_duration);
              }
         } else {
-             ui.label("Cannot calculate parameters for these durations and tilt.");
-             // Предоставляем подсказки, почему расчет не удался
+             ui.label(egui::RichText::new("Cannot calculate parameters for this configuration.").color(egui::Color32::RED));
+             // Provide hints based on common issues
              let total = timed_config.day_duration_secs + timed_config.night_duration_secs;
              if total <= 0.0 {
-                 ui.label("Error: Total duration must be positive.");
+                 ui.label(egui::RichText::new("Error: Total duration must be positive.").color(egui::Color32::RED));
+             } else if timed_config.max_sun_height_deg < 0.0 || timed_config.max_sun_height_deg > 90.0 {
+                  ui.label(egui::RichText::new("Error: Max height must be between 0 and 90 degrees.").color(egui::Color32::RED));
              } else if timed_config.planet_tilt_degrees.abs() < f32::EPSILON && (timed_config.day_duration_secs / total - 0.5).abs() > f32::EPSILON {
-                  ui.label("Error: With 0 tilt, day/night must be equal duration.");
-             } else {
-                 // Проверяем условия вечного дня/ночи, для которых calculate_timed_sky_center_params может вернуть None
-                  if timed_config.day_duration_secs.abs() < f32::EPSILON && timed_config.night_duration_secs > 0.0 {
-                     ui.label("Error: Perpetual night requires polar setup (not handled by calculation).");
-                  } else if timed_config.night_duration_secs.abs() < f32::EPSILON && timed_config.day_duration_secs > 0.0 {
-                     ui.label("Error: Perpetual day requires polar setup (not handled by calculation).");
-                  } else {
-                      ui.label("Check day/night durations or tilt; impossible combination for Summer Solstice.");
-                  }
+                  ui.label(egui::RichText::new("Error: With 0 tilt, day/night must be equal duration (12/12).").color(egui::Color32::RED));
+             } else if timed_config.day_duration_secs < f32::EPSILON && timed_config.max_sun_height_deg > f32::EPSILON {
+                  ui.label(egui::RichText::new("Error: Perpetual night is requested, but max height > 0 is impossible.").color(egui::Color32::RED));
+             } else if timed_config.night_duration_secs < f32::EPSILON && timed_config.max_sun_height_deg < f32::EPSILON {
+                 ui.label(egui::RichText::new("Error: Perpetual day is requested, but max height <= 0 is impossible (unless 12/12 max height 0).").color(egui::Color32::RED));
              }
+              else {
+                  ui.label(egui::RichText::new("Impossible combination of day/night ratio and max height for the given tilt.").color(egui::Color32::RED));
+                  ui.label(egui::RichText::new("Try adjusting tilt, durations, or max height.").color(egui::Color32::RED));
+              }
         }
 
         ui.separator();
 
-        // --- Отображаем информацию из активного SkyCenter (если присутствует) ---
+        // --- Display information from the active SkyCenter (if present) ---
         ui.heading("Current Active Sky Center Info");
-        // Этот блок содержит всю информацию о *текущем активном* SkyCenter
-        if let Some(mut sky_center) = sky_center_option { // Примечание: здесь нужен mut, чтобы разрешить изменения слайдеров
+        if let Some(mut sky_center) = sky_center_option { // Need mut to allow slider changes
 
             ui.label(format!("Actual Latitude: {:.2}°", sky_center.latitude_degrees));
             ui.label(format!("Actual Planet Tilt: {:.2}°", sky_center.planet_tilt_degrees));
-            ui.label(format!("Actual Year Fraction: {:.2}", sky_center.year_fraction));
-            ui.add(egui::Slider::new(&mut sky_center.cycle_duration_secs, 1.0..=120.0).text("Actual Cycle Duration (s)")); // Позволяем изменять фактическую длительность цикла
+            ui.label(format!("Actual Year Fraction: {:.4}", sky_center.year_fraction));
+             let actual_dec_deg = sky_center.planet_tilt_degrees * (sky_center.year_fraction * 2.0 * PI).sin() * RADIANS_TO_DEGREES;
+             ui.label(format!("Actual Declination: {:.2}°", actual_dec_deg));
+            ui.add(egui::Slider::new(&mut sky_center.cycle_duration_secs, 0.0..=120.0).text("Actual Cycle Duration (s)")); // Allow changing actual duration
 
-            // Опция паузы/воспроизведения времени
-            let is_paused = sky_center.cycle_duration_secs <= 0.0;
-            if ui.button(if is_paused { "Play" } else { "Pause" }).clicked() {
+            // Pause/Play option
+            let is_paused = sky_center.cycle_duration_secs <= f32::EPSILON;
+            let pause_text = if is_paused { "Play" } else { "Pause" };
+            if ui.button(pause_text).clicked() {
                  if is_paused {
-                      // Восстанавливаем значение длительности, если на паузе
-                      sky_center.cycle_duration_secs = 30.0; // Восстанавливаем цикл на 30 секунд
-                       // Убеждаемся, что current_cycle_time находится в пределах после снятия паузы
-                      sky_center.current_cycle_time %= sky_center.cycle_duration_secs.max(f32::EPSILON); // max(f32::EPSILON) для предотвращения деления на ноль
+                      // Restore a default value or previous value? Let's use 30s if it was 0
+                      if sky_center.cycle_duration_secs <= f32::EPSILON {
+                         sky_center.cycle_duration_secs = 30.0;
+                      }
+                       // Ensure current_cycle_time is a valid fraction if it was a fraction
+                      sky_center.current_cycle_time = sky_center.current_cycle_time.fract().max(0.0);
+                       if sky_center.cycle_duration_secs > f32::EPSILON { // Normalize if duration is now positive
+                          sky_center.current_cycle_time *= sky_center.cycle_duration_secs;
+                       }
                  } else {
-                      sky_center.cycle_duration_secs = 0.0; // Пауза
+                     // Pause: Store the current state as a fraction [0, 1)
+                      if sky_center.cycle_duration_secs > f32::EPSILON {
+                        sky_center.current_cycle_time /= sky_center.cycle_duration_secs;
+                      } // else it might already be a fraction if it was paused before
+                      sky_center.cycle_duration_secs = 0.0; // Pause
                  }
             }
 
-            // Слайдер времени для активного цикла
-            let mut current_cycle_time = sky_center.current_cycle_time;
-            if sky_center.cycle_duration_secs > 0.0 {
-                if ui.add(egui::Slider::new(&mut current_cycle_time, 0.0..=sky_center.cycle_duration_secs).text("Current Cycle Time (s)")).changed() {
-                   sky_center.current_cycle_time = current_cycle_time;
-                }
+            // Time slider for active cycle
+            let hour_fraction = if sky_center.cycle_duration_secs > f32::EPSILON {
+                 sky_center.current_cycle_time / sky_center.cycle_duration_secs
             } else {
-                 // Если на паузе, позволяем пользователю установить время через долю 0-1
-                 let mut current_cycle_fraction = sky_center.current_cycle_time; // Используем current_cycle_time как долю 0-1
-                 if ui.add(egui::Slider::new(&mut current_cycle_fraction, 0.0..=1.0).text("Current Cycle Fraction (0-1)")).changed() {
-                    sky_center.current_cycle_time = current_cycle_fraction.clamp(0.0, 1.0);
+                 sky_center.current_cycle_time.clamp(0.0, 1.0) // Treat as fraction 0-1 when paused
+            };
+            let mut display_time = hour_fraction * 24.0; // Display as hours 0-24
+
+            let slider_response = if sky_center.cycle_duration_secs > f32::EPSILON {
+                // Slide using actual time
+                let cycle_duration = sky_center.cycle_duration_secs;
+                 ui.add(egui::Slider::new(&mut sky_center.current_cycle_time, 0.0..=cycle_duration).text("Current Cycle Time (s)"))
+            } else {
+                // Slide using hour representation when paused (current_cycle_time stores the fraction)
+                 let mut display_fraction = hour_fraction;
+                 let response = ui.add(egui::Slider::new(&mut display_fraction, 0.0..=1.0).text("Current Cycle Fraction (0-1)"));
+                 if response.changed() {
+                     sky_center.current_cycle_time = display_fraction.clamp(0.0, 1.0);
                  }
-                 ui.label("Time is paused.");
+                 response
+            };
+
+            // Show time of day in 24hr format
+            if !is_paused {
+                 ui.label(format!("Time of Day: {:02.0}:{:02.0} ({:.2} hours)",
+                    (hour_fraction * 24.0) as u32,
+                    ((hour_fraction * 24.0).fract() * 60.0) as u32,
+                    hour_fraction * 24.0
+                 ));
+            } else {
+                 ui.label(format!("Time of Day: {:.2} hours (Paused)", hour_fraction * 24.0));
             }
 
 
-            // Получаем текущую информацию о солнце из его трансформации
+            // Get current sun info from its transform
             ui.separator();
             ui.heading("Current Sun Info");
-            // Этот вложенный блок содержит информацию о солнце и график, зависящие от наличия трансформации солнца
-            // Используем отдельный запрос для трансформации солнца
             let sun_transform_actual = q_sun_transform.get(sky_center.sun).ok();
 
 
-            if let Some(sun_transform) = sun_transform_actual { // Начало блока sun_transform_actual
+            if let Some(sun_transform) = sun_transform_actual { // Start of sun_transform_actual block
 
-                 // Вектор ОТ наблюдателя К солнцу - это Transform.local_z(), если +Z света указывает на солнце.
-                 let current_sun_direction = sun_transform.local_z();
+                 // DirectionalLight direction is -Transform.local_z().
+                 // The vector FROM the origin TOWARDS the light is Transform.translation.
+                 // This translation vector IS the sun direction vector from the observer.
+                 let current_sun_direction = sun_transform.translation.normalize(); // Normalize for clarity
 
-                 let elevation_rad = current_sun_direction.y.asin(); // Y - вверх
+                 let elevation_rad = current_sun_direction.y.asin(); // Y is Up
                  let elevation_degrees = elevation_rad * RADIANS_TO_DEGREES;
                  ui.label(format!("Sun Elevation: {:.1}°", elevation_degrees));
 
-                 // X - Восток, Z - Север. Угол от +Z к +X.
+                 // X is East, Z is North. Azimuth from North towards East.
                  let horizontal_direction = Vec2::new(current_sun_direction.x, current_sun_direction.z);
                  let heading_rad = horizontal_direction.x.atan2(horizontal_direction.y); // atan2(East, North)
                  let mut heading_degrees = heading_rad * RADIANS_TO_DEGREES;
-                 if heading_degrees < 0.0 { heading_degrees += 360.0; } // Нормализуем 0-360
+                 if heading_degrees < 0.0 { heading_degrees += 360.0; } // Normalize 0-360
                   ui.label(format!("Sun Heading (from North): {:.1}°", heading_degrees));
 
-                  let hour_fraction = if sky_center.cycle_duration_secs > 0.0 {
-                      sky_center.current_cycle_time / sky_center.cycle_duration_secs
-                  } else {
-                      sky_center.current_cycle_time.clamp(0.0, 1.0) // Используем значение 0-1 напрямую, если на паузе
-                  };
-                  let hour_of_day = hour_fraction * 24.0;
-                  ui.label(format!("Time of Day: {:.2} hours", hour_of_day));
 
                   ui.separator();
                   ui.heading("Sun Trajectory Plot (Active Settings)");
@@ -296,7 +321,7 @@ fn ui_system(
                   let n_points = 100;
                   let latitude_rad = sky_center.latitude_degrees * DEGREES_TO_RADIANS;
                   let axial_tilt_rad = sky_center.planet_tilt_degrees * DEGREES_TO_RADIANS;
-                  let year_fraction = sky_center.year_fraction; // Используем фактическую долю года из SkyCenter
+                  let year_fraction = sky_center.year_fraction; // Use actual year fraction
 
                   let mut sun_elevation_points: Vec<[f64; 2]> = Vec::new();
                   let mut sun_heading_points: Vec<[f64; 2]> = Vec::new();
@@ -316,7 +341,8 @@ fn ui_system(
 
                       let horizontal_direction_plot = Vec2::new(sun_direction.x, sun_direction.z);
                       let heading_rad = horizontal_direction_plot.x.atan2(horizontal_direction_plot.y);
-                      let heading_degrees = heading_rad * RADIANS_TO_DEGREES;
+                       let mut heading_degrees = heading_rad * RADIANS_TO_DEGREES;
+                       if heading_degrees < 0.0 { heading_degrees += 360.0; }
                       sun_heading_points.push([hour_fraction_plot as f64, heading_degrees as f64]);
                   }
 
@@ -334,13 +360,13 @@ fn ui_system(
                           plot_ui.line(sun_heading_line);
                       });
 
-            } else { // else для sun_transform_actual
+            } else { // else for sun_transform_actual
                 ui.label("Sun entity transform not found.");
-            } // Конец блока sun_transform_actual
+            } // End of sun_transform_actual block
 
-        } else { // else для sky_center_option
-            ui.label("SkyCenter component not active yet. Apply settings first.");
-        } // Конец блока sky_center_option
+        } else { // else for sky_center_option
+            ui.label("SkyCenter component not active yet. Apply config first.");
+        } // End of sky_center_option block
 
-    }); // Конец замыкания Window
-} // Конец функции ui_system
+    }); // End of Window closure
+} // End of ui_system function
