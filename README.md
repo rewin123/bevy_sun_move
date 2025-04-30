@@ -1,5 +1,3 @@
-Okay, here is a draft README.md file for your bevy_sun_move library, based on the provided code.
-
 # bevy_sun_move
 
 A Bevy plugin for simulating realistic sun movement, integrating well with Bevy's `Atmosphere` and PBR lighting.
