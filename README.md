@@ -4,8 +4,8 @@ A Bevy plugin for simulating realistic sun movement, integrating well with Bevy'
 
 This plugin provides components and systems to:
 
-1.  **Animate a directional light (the "sun")** across the sky based on astronomical principles (latitude, year fraction, time of day).
-2.  **Calculate necessary astronomical parameters** (latitude, year fraction) to achieve a *desired* day length, night length, and maximum sun height (noon altitude). This allows very fast to specify game timings with saving correct sun move on the sky.
+1.  **Calculate necessary astronomical parameters** (latitude, year fraction) to achieve a *desired* day length, night length, and maximum sun height (noon altitude). This allows very fast to specify game timings with saving correct sun move on the sky.
+2.  **Animate a directional light (the "sun")** across the sky based on astronomical principles (latitude, year fraction, time of day).
 3.  **Rotate a "sky sphere" entity** with the apparent motion of the celestial sphere, useful for attaching other celestial bodies or a sky mesh.
 4.  **Include an optional basic random star field** whose visibility can fade during the day.
 
