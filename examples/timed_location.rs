@@ -1,11 +1,8 @@
-// examples/timed_location.rs
-
 use std::f32::consts::PI;
 
 use bevy::{
     core_pipeline::{auto_exposure::AutoExposure, bloom::Bloom, tonemapping::Tonemapping}, gltf::GltfAssetLabel, pbr::{light_consts::lux, AmbientLight, Atmosphere, AtmosphereSettings, CascadeShadowConfigBuilder, NotShadowCaster}, prelude::*, render::{camera::Exposure, mesh::Mesh3d, render_resource::Face}, scene::SceneRoot
 };
-// Импортируем все необходимое из вашей библиотеки, включая вспомогательные функции и компоненты
 use bevy_sun_move::{
     random_stars::*, *
 };
@@ -16,13 +13,13 @@ use egui_plot::{Line, Plot, PlotPoints};
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_plugins(SunMovePlugin) // Ваш плагин (теперь без автоматической настройки по времени)
+        .add_plugins(SunMovePlugin) 
         .add_plugins(RandomStarsPlugin)
         .add_plugins(EguiPlugin {
             enable_multipass_for_primary_context: false
         })
         .add_systems(Startup, (setup_camera_fog, setup_terrain_scene))
-        .add_systems(Update, ui_system) // Система UI будет управлять настройками по времени и обновлять SkyCenter
+        .add_systems(Update, ui_system)
         .run();
 }
 
@@ -50,14 +47,12 @@ fn setup_camera_fog(mut commands: Commands) {
 struct Terrain;
 
 
-// Спавним сцену, аналогичную примеру из github bevy
   fn setup_terrain_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
 ) {
-    // Настраиваем каскадную карту теней, масштабированную для этой сцены (единицы меша в км)
     let cascade_shadow_config = CascadeShadowConfigBuilder {
         first_cascade_far_bound: 0.3,
         maximum_distance: 3.0,
@@ -69,10 +64,9 @@ struct Terrain;
     let sun_id = commands.spawn((
         DirectionalLight {
             shadows_enabled: true,
-            illuminance: lux::RAW_SUNLIGHT, // Полная освещенность от солнечного света
+            illuminance: lux::RAW_SUNLIGHT, 
             ..default()
         },
-        // Начальная позиция не имеет значения для вращения DirectionalLight
         Transform::default(),
         cascade_shadow_config,
     )).id();
@@ -85,7 +79,6 @@ struct Terrain;
         max_sun_height_deg: 45.0, // Usual value for pretty shadow in middle of the day
     };
 
-    // Спавним сущность с TimedSkyCenter и базовыми компонентами, необходимыми для SkyCenter
     commands.spawn((
         sky_config.clone(),
         SkyCenter::from_timed_config(&sky_config).unwrap(),
@@ -93,13 +86,12 @@ struct Terrain;
         Visibility::Visible,
         StarSpawner {
             star_count: 1000,
-            spawn_radius: 5000.0, // Звезды должны быть очень далеко
+            spawn_radius: 5000.0, 
         },
     ));
 
     let sphere_mesh = meshes.add(Mesh::from(Sphere { radius: 1.0 }));
 
-    // Сферы для пробников освещения (используем Mesh3dBundle для удобства)
     commands.spawn((
         Mesh3d(sphere_mesh.clone()),
         MeshMaterial3d(materials.add(StandardMaterial {
@@ -123,7 +115,6 @@ struct Terrain;
     ));
 
 
-    // Террейн (используем SceneBundle для удобства)
     commands.spawn((
         SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("terrain.glb"))),
         Transform::from_xyz(-1.0, 0.0, -0.5)
@@ -131,7 +122,6 @@ struct Terrain;
             .with_rotation(Quat::from_rotation_y(PI / 2.0)),
     ));
 
-    // Добавляем маркерную сферу в начале координат
     commands.spawn((
         Mesh3d(meshes.add(Sphere::new(0.02))),
         MeshMaterial3d(materials.add(Color::srgb(1.0, 0.0, 0.0))),
@@ -142,17 +132,13 @@ struct Terrain;
 // --- Система UI ---
 fn ui_system(
     mut contexts: EguiContexts,
-    mut commands: Commands, // Need commands to remove/insert components
-    // Query for the entity that should have the sky components.
-    // It must have TimedSkyConfig for the UI, and *may* have SkyCenter if active.
+    mut commands: Commands, 
     mut q_sky_entity: Query<(Entity, &mut TimedSkyConfig, Option<&mut SkyCenter>)>,
-    // Query for the sun entity's transform separately
     q_sun_transform: Query<&Transform, Without<SkyCenter>>,
 ) {
-    // Use get_single_mut() to handle the case where the query is empty or not unique
-    let (entity, mut timed_config, sky_center_option) = match q_sky_entity.get_single_mut() {
+    let (entity, mut timed_config, mut sky_center_option) = match q_sky_entity.get_single_mut() {
         Ok(data) => data,
-        Err(_) => return, // Exit if entity not found or not unique
+        Err(_) => return, 
     };
 
     egui::Window::new("Sky Cycle Settings").show(contexts.ctx_mut(), |ui| {
@@ -192,10 +178,16 @@ fn ui_system(
                      current_cycle_time: 0.0, // Reset time to midnight when applying
                  };
 
-                 // Remove the old SkyCenter if it exists
-                 commands.entity(entity).remove::<SkyCenter>();
-                 // Insert the new SkyCenter
-                 commands.entity(entity).insert(new_sky_center);
+                 if let Some(mut sky_center) = sky_center_option.as_mut() {
+                    // Rewrite the existing SkyCenter
+                    sky_center.latitude_degrees = lat;
+                    sky_center.planet_tilt_degrees = timed_config.planet_tilt_degrees;
+                    sky_center.year_fraction = year;
+                    sky_center.cycle_duration_secs = total_duration;
+                    sky_center.sun = timed_config.sun_entity;
+                 } else {
+                    commands.entity(entity).insert(new_sky_center);
+                 }
 
                  info!("Applied new SkyCenter settings: Lat {:.2}°, Dec {:.2}°, YF {:.4}, Cycle {:.2}s", lat, dec, year, total_duration);
              }
@@ -262,10 +254,8 @@ fn ui_system(
             } else {
                  sky_center.current_cycle_time.clamp(0.0, 1.0) // Treat as fraction 0-1 when paused
             };
-            let mut display_time = hour_fraction * 24.0; // Display as hours 0-24
 
-            let slider_response = if sky_center.cycle_duration_secs > f32::EPSILON {
-                // Slide using actual time
+            if sky_center.cycle_duration_secs > f32::EPSILON {
                 let cycle_duration = sky_center.cycle_duration_secs;
                  ui.add(egui::Slider::new(&mut sky_center.current_cycle_time, 0.0..=cycle_duration).text("Current Cycle Time (s)"))
             } else {
@@ -364,9 +354,9 @@ fn ui_system(
                 ui.label("Sun entity transform not found.");
             } // End of sun_transform_actual block
 
-        } else { // else for sky_center_option
+        } else { 
             ui.label("SkyCenter component not active yet. Apply config first.");
-        } // End of sky_center_option block
+        } 
 
-    }); // End of Window closure
-} // End of ui_system function
+    }); 
+} 
