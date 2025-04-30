@@ -2,6 +2,9 @@
 name = "bevy_sun_move"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+description = "A Bevy plugin for simulating realistic sun movement"
+authors = ["rewin <rewin1996@gmail.com>"]
 
 [dependencies]
 bevy = "0.16"
