@@ -9,16 +9,16 @@ use bevy::{
     },
     prelude::*,
     render::{camera::Exposure, mesh::Mesh3d},
-    scene::SceneRoot, // Added missing imports
+    scene::SceneRoot,
 };
 use bevy_egui::{EguiContexts, EguiPlugin, egui};
-use bevy_sun_move::{random_stars::*, *}; // Your library
-use egui_plot::{Line, Plot}; // Added AxisHints
+use bevy_sun_move::{random_stars::*, *}; 
+use egui_plot::{Line, Plot};
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_plugins(SunMovePlugin) // Your plugin
+        .add_plugins(SunMovePlugin)
         .add_plugins(RandomStarsPlugin)
         .add_plugins(EguiPlugin {
             enable_multipass_for_primary_context: false,
