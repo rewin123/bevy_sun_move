@@ -1,5 +1,3 @@
-use std::f32::consts::PI;
-
 use bevy::{
     core_pipeline::{bloom::Bloom, tonemapping::Tonemapping},
     pbr::{
