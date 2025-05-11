@@ -11,7 +11,40 @@ pub struct SunMovePlugin;
 
 impl Plugin for SunMovePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, update_sky_center);
+        app.add_systems(Update, update_sky_center::<Time>);
+    }
+}
+
+pub trait ISunTime {
+    fn delta_secs(&self) -> f32;
+    fn elapsed_secs(&self) -> f32;
+}
+
+impl<T: Default + Send + Sync + 'static> ISunTime for Time<T> {
+    fn delta_secs(&self) -> f32 {
+        self.delta_secs()
+    }
+
+    fn elapsed_secs(&self) -> f32 {
+        self.elapsed_secs()
+    }
+}
+
+pub struct TypedSunMovePlugin<T: ISunTime + Resource> {
+    _marker: std::marker::PhantomData<T>,
+}
+
+impl<T: ISunTime + Resource> Default for TypedSunMovePlugin<T> {
+    fn default() -> Self {
+        Self {
+            _marker: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<T: ISunTime + Resource> Plugin for TypedSunMovePlugin<T> {
+    fn build(&self, app: &mut App) {
+        app.add_systems(Update, update_sky_center::<T>);
     }
 }
 
@@ -488,14 +521,14 @@ pub fn calculate_sun_direction(
     sun_direction_local.normalize()
 }
 
-fn update_sky_center(
+fn update_sky_center<T: ISunTime + Resource>(
     mut q_sky_center: Query<(&mut Transform, &mut SkyCenter)>,
     mut q_sun: Query<&mut Transform, Without<SkyCenter>>,
-    time: Res<Time>,
+    time: Res<T>,
 ) {
     for (mut sky_transforms, mut sky_center) in q_sky_center.iter_mut() {
         // Update time
-        sky_center.current_cycle_time += time.delta_secs();
+        sky_center.current_cycle_time = time.elapsed_secs();
         sky_center.current_cycle_time %= sky_center.cycle_duration_secs; // Cycle time loops
 
         let hour_fraction = sky_center.current_cycle_time / sky_center.cycle_duration_secs;

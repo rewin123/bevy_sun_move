@@ -1,9 +1,6 @@
 use bevy::{
     core_pipeline::{bloom::Bloom, tonemapping::Tonemapping},
-    pbr::{
-        Atmosphere, AtmosphereSettings,
-        light_consts::lux,
-    },
+    pbr::{Atmosphere, AtmosphereSettings, light_consts::lux},
     prelude::*,
     render::{camera::Exposure, mesh::Mesh3d},
 };
@@ -39,14 +36,12 @@ fn setup_camera_fog(mut commands: Commands) {
     ));
 }
 
-
 // Spawn scene similar to the bevy github example
 fn setup_terrain_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-
     // Sun
     let sun_id = commands
         .spawn((

@@ -3,10 +3,7 @@ use std::f32::consts::PI;
 use bevy::{
     core_pipeline::{bloom::Bloom, tonemapping::Tonemapping},
     gltf::GltfAssetLabel,
-    pbr::{
-        Atmosphere, AtmosphereSettings, CascadeShadowConfigBuilder,
-        light_consts::lux,
-    },
+    pbr::{Atmosphere, AtmosphereSettings, CascadeShadowConfigBuilder, light_consts::lux},
     prelude::*,
     render::{camera::Exposure, mesh::Mesh3d},
     scene::SceneRoot,

@@ -3,16 +3,13 @@ use std::f32::consts::PI;
 use bevy::{
     core_pipeline::{bloom::Bloom, tonemapping::Tonemapping},
     gltf::GltfAssetLabel,
-    pbr::{
-        Atmosphere, AtmosphereSettings, CascadeShadowConfigBuilder,
-        light_consts::lux,
-    },
+    pbr::{Atmosphere, AtmosphereSettings, CascadeShadowConfigBuilder, light_consts::lux},
     prelude::*,
     render::{camera::Exposure, mesh::Mesh3d},
     scene::SceneRoot,
 };
 use bevy_egui::{EguiContexts, EguiPlugin, egui};
-use bevy_sun_move::{random_stars::*, *}; 
+use bevy_sun_move::{random_stars::*, *};
 use egui_plot::{Line, Plot};
 
 fn main() {
