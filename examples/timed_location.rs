@@ -287,8 +287,8 @@ fn ui_system(
             let sun_transform_actual = q_sun_transform.get(sky_center.sun).ok();
 
 
-            if let Some(sun_transform) = sun_transform_actual { 
-                 let current_sun_direction = sun_transform.translation.normalize(); 
+            if let Some(sun_transform) = sun_transform_actual {
+                 let current_sun_direction = sun_transform.translation.normalize();
 
                  let elevation_rad = current_sun_direction.y.asin(); // Y is Up
                  let elevation_degrees = elevation_rad * RADIANS_TO_DEGREES;
@@ -349,11 +349,11 @@ fn ui_system(
 
             } else {
                 ui.label("Sun entity transform not found.");
-            } 
+            }
 
-        } else { 
+        } else {
             ui.label("SkyCenter component not active yet. Apply config first.");
-        } 
+        }
 
     });
 }
