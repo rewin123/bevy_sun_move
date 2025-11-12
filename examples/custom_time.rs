@@ -1,8 +1,10 @@
 use bevy::{
-    core_pipeline::{bloom::Bloom, tonemapping::Tonemapping},
-    pbr::{Atmosphere, AtmosphereSettings, light_consts::lux},
-    prelude::*,
-    render::{camera::Exposure, mesh::Mesh3d},
+    camera::Exposure,
+    core_pipeline::tonemapping::Tonemapping,
+    light::light_consts::lux,
+    pbr::{Atmosphere, AtmosphereSettings},
+    post_process::bloom::Bloom,
+    prelude::*, render::view::Hdr,
 };
 use bevy_egui::*;
 use bevy_sun_move::{random_stars::*, *};
@@ -12,13 +14,11 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugins(TypedSunMovePlugin::<Time<CustomTime>>::default())
         .add_plugins(RandomStarsPlugin)
-        .add_plugins(EguiPlugin {
-            enable_multipass_for_primary_context: false,
-        })
+        .add_plugins(EguiPlugin::default())
         .insert_resource(Time::<CustomTime>::default())
         .add_systems(Startup, (setup_camera_fog, setup_terrain_scene))
         .add_systems(Update, update_custom_time)
-        .add_systems(Update, ui_custom_time)
+        .add_systems(EguiPrimaryContextPass, ui_custom_time)
         .run();
 }
 
@@ -46,11 +46,11 @@ fn ui_custom_time(
     mut custom_time: ResMut<Time<CustomTime>>,
     time: Res<Time>,
     mut egui_context: EguiContexts,
-) {
+) -> Result {
     const MIN_PLAY_SPEED: f32 = 0.125;
     const MAX_PLAY_SPEED: f32 = 16.0;
 
-    egui::Window::new("Custom Time").show(egui_context.ctx_mut(), |ui| {
+    egui::Window::new("Custom Time").show(egui_context.ctx_mut()?, |ui| {
         ui.label(format!(
             "Custom time: {:.2} seconds",
             custom_time.elapsed_secs()
@@ -146,6 +146,8 @@ fn ui_custom_time(
             }
         });
     });
+
+    Ok(())
 }
 
 // Spawn scene similar to the bevy github example
@@ -225,10 +227,7 @@ fn setup_camera_fog(mut commands: Commands) {
         Camera3d::default(),
         Transform::from_xyz(-1.2, 0.15, 0.0).looking_at(Vec3::Y * 0.1, Vec3::Y),
         // HDR is required for atmospheric scattering to be properly applied to the scene
-        Camera {
-            hdr: true,
-            ..default()
-        },
+        Hdr,
         Atmosphere::EARTH,
         AtmosphereSettings {
             aerial_view_lut_max_distance: 3.2e5,

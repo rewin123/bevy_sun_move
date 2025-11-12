@@ -1,14 +1,17 @@
 use std::f32::consts::PI;
 
 use bevy::{
-    core_pipeline::{bloom::Bloom, tonemapping::Tonemapping},
+    camera::Exposure,
+    core_pipeline::tonemapping::Tonemapping,
     gltf::GltfAssetLabel,
-    pbr::{Atmosphere, AtmosphereSettings, CascadeShadowConfigBuilder, light_consts::lux},
+    light::{CascadeShadowConfigBuilder, light_consts::lux},
+    pbr::{Atmosphere, AtmosphereSettings},
+    post_process::bloom::Bloom,
     prelude::*,
-    render::{camera::Exposure, mesh::Mesh3d},
+    render::view::Hdr,
     scene::SceneRoot,
 };
-use bevy_egui::{EguiContexts, EguiPlugin, egui};
+use bevy_egui::{EguiContexts, EguiPlugin, EguiPrimaryContextPass, egui};
 use bevy_sun_move::{random_stars::*, *};
 use egui_plot::{Line, Plot};
 
@@ -17,11 +20,9 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugins(SunMovePlugin)
         .add_plugins(RandomStarsPlugin)
-        .add_plugins(EguiPlugin {
-            enable_multipass_for_primary_context: false,
-        })
+        .add_plugins(EguiPlugin::default())
         .add_systems(Startup, (setup_camera_fog, setup_terrain_scene))
-        .add_systems(Update, ui_system)
+        .add_systems(EguiPrimaryContextPass, ui_system)
         .run();
 }
 
@@ -30,10 +31,7 @@ fn setup_camera_fog(mut commands: Commands) {
         Camera3d::default(),
         Transform::from_xyz(-1.2, 0.15, 0.0).looking_at(Vec3::Y * 0.1, Vec3::Y),
         // HDR is required for atmospheric scattering to be properly applied to the scene
-        Camera {
-            hdr: true,
-            ..default()
-        },
+        Hdr,
         Atmosphere::EARTH,
         AtmosphereSettings {
             aerial_view_lut_max_distance: 3.2e5,
@@ -140,13 +138,13 @@ fn ui_system(
     mut contexts: EguiContexts,
     mut q_sky_center: Query<&mut SkyCenter>,
     q_transform: Query<&Transform>,
-) {
+) -> Result {
     let mut sky_center = match q_sky_center.single_mut() {
         Ok(sc) => sc,
-        Err(_) => return,
+        Err(_) => return Ok(()),
     };
 
-    egui::Window::new("Sun Controls & Info").show(contexts.ctx_mut(), |ui| {
+    egui::Window::new("Sun Controls & Info").show(contexts.ctx_mut()?, |ui| {
         ui.heading("Sun Parameters");
         ui.add(
             egui::Slider::new(&mut sky_center.latitude_degrees, -90.0..=90.0).text("Latitude (°)"),
@@ -272,4 +270,6 @@ fn ui_system(
                 plot_ui.line(sun_heading_line);
             });
     });
+
+    Ok(())
 }

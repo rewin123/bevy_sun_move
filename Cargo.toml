@@ -1,15 +1,15 @@
 [package]
 name = "bevy_sun_move"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
 description = "A Bevy plugin for simulating realistic sun movement"
 authors = ["rewin <rewin1996@gmail.com>"]
 
 [dependencies]
-bevy = "0.16"
-rand = "0.9.1"
+bevy = "0.17"
+rand = "0.9"
 
 [dev-dependencies]
-bevy_egui = "0.34"
-egui_plot = "0.32.1"
+bevy_egui = "0.38"
+egui_plot = "0.34"

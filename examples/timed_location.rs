@@ -1,14 +1,17 @@
 use std::f32::consts::PI;
 
 use bevy::{
-    core_pipeline::{bloom::Bloom, tonemapping::Tonemapping},
+    camera::Exposure,
+    core_pipeline::tonemapping::Tonemapping,
     gltf::GltfAssetLabel,
-    pbr::{Atmosphere, AtmosphereSettings, CascadeShadowConfigBuilder, light_consts::lux},
+    light::{CascadeShadowConfigBuilder, light_consts::lux},
+    pbr::{Atmosphere, AtmosphereSettings},
+    post_process::bloom::Bloom,
     prelude::*,
-    render::{camera::Exposure, mesh::Mesh3d},
+    render::view::Hdr,
     scene::SceneRoot,
 };
-use bevy_egui::{EguiContexts, EguiPlugin, egui};
+use bevy_egui::{EguiContexts, EguiPlugin, EguiPrimaryContextPass, egui};
 use bevy_sun_move::{random_stars::*, *};
 use egui_plot::{Line, Plot};
 
@@ -17,11 +20,9 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugins(SunMovePlugin)
         .add_plugins(RandomStarsPlugin)
-        .add_plugins(EguiPlugin {
-            enable_multipass_for_primary_context: false,
-        })
+        .add_plugins(EguiPlugin::default())
         .add_systems(Startup, (setup_camera_fog, setup_terrain_scene))
-        .add_systems(Update, ui_system)
+        .add_systems(EguiPrimaryContextPass, ui_system)
         .run();
 }
 
@@ -29,10 +30,7 @@ fn setup_camera_fog(mut commands: Commands) {
     commands.spawn((
         Camera3d::default(),
         Transform::from_xyz(-1.2, 0.15, 0.0).looking_at(Vec3::Y * 0.1, Vec3::Y),
-        Camera {
-            hdr: true,
-            ..default()
-        },
+        Hdr,
         Atmosphere::EARTH,
         AtmosphereSettings {
             aerial_view_lut_max_distance: 3.2e5,
@@ -136,13 +134,13 @@ fn ui_system(
     mut commands: Commands,
     mut q_sky_entity: Query<(Entity, &mut TimedSkyConfig, Option<&mut SkyCenter>)>,
     q_sun_transform: Query<&Transform, Without<SkyCenter>>,
-) {
+) -> Result {
     let (entity, mut timed_config, mut sky_center_option) = match q_sky_entity.single_mut() {
         Ok(data) => data,
-        Err(_) => return,
+        Err(_) => return Ok(()),
     };
 
-    egui::Window::new("Sky Cycle Settings").show(contexts.ctx_mut(), |ui| {
+    egui::Window::new("Sky Cycle Settings").show(contexts.ctx_mut()?, |ui| {
         ui.heading("Timed Sky Config");
         ui.label("Configure desired day/night durations and max sun height.");
 
@@ -356,4 +354,6 @@ fn ui_system(
         }
 
     });
+
+    Ok(())
 }
