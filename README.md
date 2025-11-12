@@ -177,6 +177,13 @@ A temporary struct used to calculate SkyCenter parameters based on desired timin
 - sun_entity: The Entity ID of the DirectionalLight.
 Used with `SkyCenter::from_timed_config(&timed_config) -> Option<SkyCenter>`. The function returns `None` if the requested timings and max height are impossible for the given tilt (e.g., requesting 24-hour day at the equator with 0 tilt, or a max height greater than 90 degrees).
 
+# Bevy support table
+
+| bevy | bevy_sun_move |
+|------|---------------|
+| 0.17 | 0.2           |
+| 0.16 | 0.1           |
+
 # Contributing
 
 Contributions are welcome! Feel free to open issues or pull requests on the GitHub repository.
