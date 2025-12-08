@@ -1,8 +1,11 @@
 use bevy::{
-    core_pipeline::{bloom::Bloom, tonemapping::Tonemapping},
-    pbr::{Atmosphere, AtmosphereSettings, light_consts::lux},
+    camera::Exposure,
+    core_pipeline::tonemapping::Tonemapping,
+    light::light_consts::lux,
+    pbr::{Atmosphere, AtmosphereSettings},
+    post_process::bloom::Bloom,
     prelude::*,
-    render::{camera::Exposure, mesh::Mesh3d},
+    render::view::Hdr,
 };
 use bevy_sun_move::{random_stars::*, *};
 
@@ -20,10 +23,7 @@ fn setup_camera_fog(mut commands: Commands) {
         Camera3d::default(),
         Transform::from_xyz(-1.2, 0.15, 0.0).looking_at(Vec3::Y * 0.1, Vec3::Y),
         // HDR is required for atmospheric scattering to be properly applied to the scene
-        Camera {
-            hdr: true,
-            ..default()
-        },
+        Hdr,
         Atmosphere::EARTH,
         AtmosphereSettings {
             aerial_view_lut_max_distance: 3.2e5,
