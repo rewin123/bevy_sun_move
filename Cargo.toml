@@ -7,9 +7,9 @@ description = "A Bevy plugin for simulating realistic sun movement"
 authors = ["rewin <rewin1996@gmail.com>"]
 
 [dependencies]
-bevy = "0.17"
+bevy = "0.18"
 rand = "0.9"
 
 [dev-dependencies]
-bevy_egui = "0.38"
+bevy_egui = "0.39"
 egui_plot = "0.34"
