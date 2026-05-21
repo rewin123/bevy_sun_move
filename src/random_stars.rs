@@ -1,7 +1,7 @@
 // Its definetely not the best way to do this, better to use a texture or some particle system
 // So this is just for testing purposes
 
-use bevy::{pbr::NotShadowCaster, prelude::*};
+use bevy::prelude::*;
 use rand::Rng;
 
 use crate::SkyCenter;
@@ -78,7 +78,6 @@ fn on_change_spawner(
                         .with_scale(Vec3::ONE * star_spawner.spawn_radius / 500.0),
                     Mesh3d(star_spawner_cache.mesh.clone()),
                     MeshMaterial3d(star_spawner_cache.material.clone()),
-                    NotShadowCaster,
                 ))
                 .id();
 
