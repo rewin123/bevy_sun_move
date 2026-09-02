@@ -2,7 +2,6 @@
 // So this is just for testing purposes
 
 use bevy::{light::NotShadowCaster, prelude::*};
-use rand::Rng;
 
 use crate::SkyCenter;
 
@@ -63,10 +62,9 @@ fn on_change_spawner(
             }
         }
 
-        let mut rng = rand::rng();
         for _ in 0..star_spawner.star_count {
-            let phi = rng.random_range(0.0..2.0 * std::f32::consts::PI);
-            let theta = rng.random_range(0.0..std::f32::consts::PI);
+            let phi = rand::random_range(0.0..2.0 * std::f32::consts::PI);
+            let theta = rand::random_range(0.0..std::f32::consts::PI);
             let x = star_spawner.spawn_radius * theta.sin() * phi.cos();
             let y = star_spawner.spawn_radius * theta.cos();
             let z = star_spawner.spawn_radius * theta.sin() * phi.sin();

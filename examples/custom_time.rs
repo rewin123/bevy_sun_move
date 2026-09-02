@@ -1,10 +1,10 @@
 use bevy::{
-    camera::Exposure,
+    camera::{Exposure, Hdr},
     core_pipeline::tonemapping::Tonemapping,
-    light::light_consts::lux,
-    pbr::{Atmosphere, AtmosphereSettings, ScatteringMedium},
+    light::{light_consts::lux, Atmosphere, atmosphere::ScatteringMedium},
+    pbr::AtmosphereSettings,
     post_process::bloom::Bloom,
-    prelude::*, render::view::Hdr,
+    prelude::*,
 };
 use bevy_egui::*;
 use bevy_sun_move::{random_stars::*, *};
@@ -160,7 +160,7 @@ fn setup_terrain_scene(
     let sun_id = commands
         .spawn((
             DirectionalLight {
-                shadows_enabled: true,
+                shadow_maps_enabled: true,
                 illuminance: lux::RAW_SUNLIGHT, // Full sunlight illuminance
                 ..default()
             },
@@ -231,12 +231,7 @@ fn setup_camera_fog(
         Transform::from_xyz(-1.2, 0.15, 0.0).looking_at(Vec3::Y * 0.1, Vec3::Y),
         // HDR is required for atmospheric scattering to be properly applied to the scene
         Hdr,
-        Atmosphere::earthlike(scattering_mediums.add(ScatteringMedium::default())),
-        AtmosphereSettings {
-            aerial_view_lut_max_distance: 3.2e5,
-            scene_units_to_m: 1e+4,
-            ..Default::default()
-        },
+        Atmosphere::earth(scattering_mediums.add(ScatteringMedium::default())),
         Exposure::SUNLIGHT,
         Tonemapping::AcesFitted,
         Bloom::NATURAL,
