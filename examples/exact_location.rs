@@ -1,15 +1,13 @@
 use std::f32::consts::PI;
 
 use bevy::{
-    camera::Exposure,
+    camera::{Exposure, Hdr},
     core_pipeline::tonemapping::Tonemapping,
     gltf::GltfAssetLabel,
-    light::{CascadeShadowConfigBuilder, light_consts::lux},
-    pbr::{Atmosphere, AtmosphereSettings, ScatteringMedium},
+    light::{CascadeShadowConfigBuilder, light_consts::lux, Atmosphere, atmosphere::ScatteringMedium},
+    pbr::{AtmosphereSettings},
     post_process::bloom::Bloom,
     prelude::*,
-    render::view::Hdr,
-    scene::SceneRoot,
 };
 use bevy_egui::{EguiContexts, EguiPlugin, EguiPrimaryContextPass, egui};
 use bevy_sun_move::{random_stars::*, *};
@@ -35,12 +33,7 @@ fn setup_camera_fog(
         Transform::from_xyz(-1.2, 0.15, 0.0).looking_at(Vec3::Y * 0.1, Vec3::Y),
         // HDR is required for atmospheric scattering to be properly applied to the scene
         Hdr,
-        Atmosphere::earthlike(scattering_mediums.add(ScatteringMedium::default())),
-        AtmosphereSettings {
-            aerial_view_lut_max_distance: 3.2e5,
-            scene_units_to_m: 1e+4,
-            ..Default::default()
-        },
+        Atmosphere::earth(scattering_mediums.add(ScatteringMedium::default())),
         Exposure::SUNLIGHT,
         Tonemapping::AcesFitted,
         Bloom::NATURAL,
@@ -69,7 +62,7 @@ fn setup_terrain_scene(
     let sun_id = commands
         .spawn((
             DirectionalLight {
-                shadows_enabled: true,
+                shadow_maps_enabled: true,
                 illuminance: lux::RAW_SUNLIGHT, // Full sunlight illuminance
                 ..default()
             },
@@ -124,7 +117,7 @@ fn setup_terrain_scene(
 
     // Terrain (using SceneBundle for convenience)
     commands.spawn((
-        SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("terrain.glb"))),
+        WorldAssetRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("terrain.glb"))),
         Transform::from_xyz(-1.0, 0.0, -0.5)
             .with_scale(Vec3::splat(0.5))
             .with_rotation(Quat::from_rotation_y(PI / 2.0)),
